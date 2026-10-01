@@ -1,0 +1,28 @@
+# Secrets and machine-specific settings
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+firebase-service-account.json
+secrets/
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Dependencies and generated web files
+frontend/node_modules/
+frontend/dist/
+backend/vendor/
+backend/uploads/
+
+# Android-generated files and local SDK settings
+frontend/android/.gradle/
+frontend/android/.idea/
+frontend/android/build/
+frontend/android/app/build/
+frontend/android/local.properties
+frontend/android/captures/

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Local emulator testing needs HTTP access to the PHP server. Release builds
+         retain Android's secure HTTPS-only default. -->
+    <application android:usesCleartextTraffic="true" />
+</manifest>
