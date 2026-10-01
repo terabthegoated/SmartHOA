@@ -6,7 +6,11 @@ RUN composer install --no-dev --prefer-dist --no-interaction --optimize-autoload
 
 FROM php:8.3-apache
 
-RUN docker-php-ext-install pdo_pgsql
+# The PostgreSQL PHP extension requires libpq headers during the image build.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libpq-dev \
+    && docker-php-ext-install pdo_pgsql \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /var/www/html
 COPY --from=dependencies /app/vendor ./vendor
