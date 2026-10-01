@@ -18,6 +18,7 @@ DROP TABLE IF EXISTS complaint_attachments CASCADE;
 DROP TABLE IF EXISTS complaints CASCADE;
 DROP TABLE IF EXISTS complaint_categories CASCADE;
 DROP TABLE IF EXISTS payment_receipts CASCADE;
+DROP TABLE IF EXISTS dues_policy_assessments CASCADE;
 DROP TABLE IF EXISTS payment_transactions CASCADE;
 DROP TABLE IF EXISTS payments CASCADE;
 DROP TABLE IF EXISTS payment_types CASCADE;
@@ -156,6 +157,26 @@ CREATE TABLE payment_receipts (
     uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Formal monthly assessment snapshots for the payment-policy engine. These
+-- are audit records; they do not replace or overwrite original bills.
+CREATE TABLE dues_policy_assessments (
+    assessment_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    resident_id UUID NOT NULL REFERENCES resident_profiles(resident_id) ON DELETE CASCADE,
+    policy_date DATE NOT NULL,
+    base_balance DECIMAL(10, 2) NOT NULL CHECK (base_balance >= 0),
+    previous_cycle_balance DECIMAL(10, 2) NOT NULL CHECK (previous_cycle_balance >= 0),
+    monthly_dues_added DECIMAL(10, 2) NOT NULL CHECK (monthly_dues_added >= 0),
+    interest_amount DECIMAL(10, 2) NOT NULL CHECK (interest_amount >= 0),
+    total_balance DECIMAL(10, 2) NOT NULL CHECK (total_balance >= 0),
+    months_overdue SMALLINT NOT NULL CHECK (months_overdue >= 1),
+    collection_stage VARCHAR(50) NOT NULL CHECK (
+        collection_stage IN ('first_notice', 'second_notice', 'third_notice_hearing')
+    ),
+    requires_hearing BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (resident_id, policy_date)
+);
+
 -- MODULE D: Complaint Management
 CREATE TABLE complaint_categories (
     category_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -288,6 +309,8 @@ CREATE INDEX IF NOT EXISTS idx_properties_property_use ON properties(property_us
 CREATE INDEX IF NOT EXISTS idx_airbnb_host_properties_host ON airbnb_host_properties(host_resident_id);
 CREATE INDEX IF NOT EXISTS idx_payments_resident_id ON payments(resident_id);
 CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(payment_status);
+CREATE INDEX IF NOT EXISTS idx_dues_policy_assessments_resident_date ON dues_policy_assessments(resident_id, policy_date DESC);
+CREATE INDEX IF NOT EXISTS idx_dues_policy_assessments_stage ON dues_policy_assessments(collection_stage, policy_date DESC);
 CREATE INDEX IF NOT EXISTS idx_complaints_resident_id ON complaints(resident_id);
 CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints(complaint_status);
 CREATE INDEX IF NOT EXISTS idx_complaints_priority ON complaints(priority_level);

@@ -11,6 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/../../helpers/dues_collection_policy.php';
 
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
@@ -161,23 +162,18 @@ try {
     }
     ksort($periods);
 
-    $runningBalance = 0.0;
-    $baseDues = 0.0;
-    $overdueMonths = 0;
     $currentMonthIsPaid = $currentMonthHasRecord && !$currentMonthHasUnpaidRecord;
     $displayDueDate = $dueDate;
 
-    foreach ($periods as $period) {
-        $baseDues = round($baseDues + $period['base_amount'], 2);
-        $runningBalance = round($runningBalance + $period['base_amount'], 2);
-        $monthDueDate = $period['due_date'];
-        $displayDueDate = $monthDueDate;
-
-        if ($today > $monthDueDate) {
-            $runningBalance = round($runningBalance * 1.10, 2);
-            $overdueMonths++;
-        }
+    if (!empty($periods)) {
+        $latestPeriod = end($periods);
+        $displayDueDate = $latestPeriod['due_date'];
+        reset($periods);
     }
+    $calculation = dues_policy_calculate_periods($periods, $today);
+    $runningBalance = $calculation['total_balance'];
+    $baseDues = $calculation['base_balance'];
+    $overdueMonths = $calculation['months_overdue'];
 
     if ($runningBalance === 0.0) {
         echo json_encode([

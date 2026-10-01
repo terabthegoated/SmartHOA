@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import axios from 'axios';
-import { Search, Plus, CheckCircle2, XCircle, Clock, FileText, X, Image as ImageIcon, Download, FileSpreadsheet, BellRing, AlertCircle } from 'lucide-react';
+import { Search, Plus, CheckCircle2, XCircle, Clock, FileText, X, Image as ImageIcon, Download, FileSpreadsheet, BellRing, AlertCircle, Gavel } from 'lucide-react';
 import { API_BASE_URL } from '../../config/api';
 import DuesImportPreviewModal from '../../components/payments/DuesImportPreviewModal';
 
@@ -42,6 +42,16 @@ interface ReminderResult {
   skipped?: number;
 }
 
+interface CollectionPolicyResult {
+  status: 'success' | 'error';
+  message: string;
+  billsGenerated?: number;
+  billsMarkedOverdue?: number;
+  assessmentsCreated?: number;
+  hearingReviewsFlagged?: number;
+  remindersSent?: number;
+}
+
 const BILL_TYPE_ORDER = [
   'Monthly HOA Dues',
   'Monthly HOA Dues + Penalty',
@@ -64,6 +74,8 @@ const Payments = () => {
   const [isImportPreviewOpen, setIsImportPreviewOpen] = useState(false);
   const [isSendingReminders, setIsSendingReminders] = useState(false);
   const [reminderResult, setReminderResult] = useState<ReminderResult | null>(null);
+  const [isRunningCollectionPolicy, setIsRunningCollectionPolicy] = useState(false);
+  const [collectionPolicyResult, setCollectionPolicyResult] = useState<CollectionPolicyResult | null>(null);
 
   // Generate form state
   const [selectedResidentId, setSelectedResidentId] = useState('');
@@ -255,6 +267,58 @@ const Payments = () => {
     }
   };
 
+  const handleRunCollectionPolicy = async () => {
+    if (isRunningCollectionPolicy) return;
+
+    const shouldRun = window.confirm(
+      'Run the collection policy now? SmartHOA will create any missing current-month ₱325 dues bills, mark eligible unpaid dues as overdue, and send the appropriate in-app notices. Paid bills and receipts awaiting verification will not be changed.'
+    );
+    if (!shouldRun) return;
+
+    setCollectionPolicyResult(null);
+    setIsRunningCollectionPolicy(true);
+
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/officer/run_dues_collection_policy.php`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const data = response.data && typeof response.data === 'object'
+        ? response.data as Record<string, unknown>
+        : {};
+      const summary = data.summary && typeof data.summary === 'object'
+        ? data.summary as Record<string, unknown>
+        : data;
+      const reminders = summary.reminders && typeof summary.reminders === 'object'
+        ? summary.reminders as Record<string, unknown>
+        : {};
+
+      setCollectionPolicyResult({
+        status: 'success',
+        message: typeof data.message === 'string' ? data.message : 'Collection policy completed.',
+        billsGenerated: getReminderNumber(summary, ['monthly_bills_generated']),
+        billsMarkedOverdue: getReminderNumber(summary, ['bills_marked_overdue']),
+        assessmentsCreated: getReminderNumber(summary, ['assessments_created']),
+        hearingReviewsFlagged: getReminderNumber(summary, ['hearing_reviews_flagged']),
+        remindersSent: getReminderNumber(reminders, ['sent']),
+      });
+      await fetchData();
+    } catch (error) {
+      const axiosMessage = axios.isAxiosError(error) && error.response?.data && typeof error.response.data === 'object'
+        ? (error.response.data as Record<string, unknown>).message
+        : undefined;
+      setCollectionPolicyResult({
+        status: 'error',
+        message: typeof axiosMessage === 'string'
+          ? axiosMessage
+          : 'The collection policy could not be completed. Please try again.'
+      });
+    } finally {
+      setIsRunningCollectionPolicy(false);
+    }
+  };
+
   const filteredPayments = payments.filter(p => 
     `${p.first_name} ${p.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.type_name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -334,6 +398,18 @@ const Payments = () => {
             <BellRing size={18} />
             {isSendingReminders ? 'Sending reminders...' : 'Send payment reminders'}
           </button>
+          <button
+            onClick={handleRunCollectionPolicy}
+            disabled={isRunningCollectionPolicy}
+            className={`flex items-center justify-center gap-2 border font-semibold px-5 py-2.5 rounded-xl transition-colors shadow-sm ${
+              isRunningCollectionPolicy
+                ? 'cursor-not-allowed border-brown/20 bg-cream text-brown/60'
+                : 'border-brown/20 bg-white text-brown hover:bg-cream'
+            }`}
+          >
+            <Gavel size={18} />
+            {isRunningCollectionPolicy ? 'Running policy...' : 'Run collection policy'}
+          </button>
           <button 
             onClick={exportToCSV}
             className="flex items-center gap-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold px-5 py-2.5 rounded-xl transition-colors shadow-sm"
@@ -357,6 +433,22 @@ const Payments = () => {
           </button>
         </div>
       </div>
+
+      {collectionPolicyResult && (
+        <div className={`rounded-xl border p-4 text-sm ${
+          collectionPolicyResult.status === 'success'
+            ? 'border-green-200 bg-green-50 text-green-800'
+            : 'border-red-200 bg-red-50 text-red-700'
+        }`}>
+          <p className="font-bold">{collectionPolicyResult.message}</p>
+          {collectionPolicyResult.status === 'success' && (
+            <p className="mt-1 leading-6">
+              {collectionPolicyResult.billsGenerated ?? 0} new monthly bill(s), {collectionPolicyResult.billsMarkedOverdue ?? 0} bill(s) marked overdue, {collectionPolicyResult.assessmentsCreated ?? 0} policy assessment(s), {collectionPolicyResult.remindersSent ?? 0} reminder(s) sent.
+              {(collectionPolicyResult.hearingReviewsFlagged ?? 0) > 0 && ` ${collectionPolicyResult.hearingReviewsFlagged} account(s) require hearing review; no account was automatically frozen.`}
+            </p>
+          )}
+        </div>
+      )}
 
       {reminderResult && (
         <div
