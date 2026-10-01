@@ -55,10 +55,22 @@ interface DuesPreview {
   rows: DuesPreviewRow[];
 }
 
+interface DuesImportResult {
+  message: string;
+  summary: {
+    source_rows: number;
+    imported_entries: number;
+    duplicate_entries: number;
+    review_entries: number;
+    imported_amount: number;
+  };
+}
+
 interface Props {
   isOpen: boolean;
   token: string | null;
   onClose: () => void;
+  onImported: () => void;
 }
 
 const normalizeHeader = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -135,10 +147,13 @@ const formatPeso = (value: number) => `₱${Number(value || 0).toLocaleString(un
   maximumFractionDigits: 2,
 })}`;
 
-const DuesImportPreviewModal = ({ isOpen, token, onClose }: Props) => {
+const DuesImportPreviewModal = ({ isOpen, token, onClose, onImported }: Props) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<DuesPreview | null>(null);
+  const [preparedRecords, setPreparedRecords] = useState<DuesRecord[]>([]);
+  const [importResult, setImportResult] = useState<DuesImportResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState('');
 
   if (!isOpen) return null;
@@ -146,6 +161,8 @@ const DuesImportPreviewModal = ({ isOpen, token, onClose }: Props) => {
   const reset = () => {
     setSelectedFile(null);
     setPreview(null);
+    setPreparedRecords([]);
+    setImportResult(null);
     setError('');
   };
 
@@ -157,6 +174,8 @@ const DuesImportPreviewModal = ({ isOpen, token, onClose }: Props) => {
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     setSelectedFile(event.target.files?.[0] ?? null);
     setPreview(null);
+    setPreparedRecords([]);
+    setImportResult(null);
     setError('');
   };
 
@@ -174,6 +193,7 @@ const DuesImportPreviewModal = ({ isOpen, token, onClose }: Props) => {
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setPreview(response.data);
+      setPreparedRecords(records);
     } catch (requestError) {
       const message = axios.isAxiosError(requestError)
         ? requestError.response?.data?.message ?? 'SmartHOA could not prepare the dues preview.'
@@ -183,6 +203,34 @@ const DuesImportPreviewModal = ({ isOpen, token, onClose }: Props) => {
       setError(message);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const importReadyEntries = async () => {
+    if (!preview || preparedRecords.length === 0 || !token || isImporting) return;
+
+    const confirmation = window.confirm(
+      `Import ${preview.summary.ready_entries} matched 2026 payment entries? This adds paid historical records and cannot be undone from this screen. Rows marked for review will be skipped.`,
+    );
+    if (!confirmation) return;
+
+    setIsImporting(true);
+    setError('');
+    try {
+      const response = await axios.post<DuesImportResult>(
+        `${API_BASE_URL}/api/officer/import_legacy_dues.php`,
+        { year: 2026, records: preparedRecords },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      setImportResult(response.data);
+      onImported();
+    } catch (requestError) {
+      const message = axios.isAxiosError(requestError)
+        ? requestError.response?.data?.message ?? 'SmartHOA could not import the historical dues records.'
+        : 'SmartHOA could not import the historical dues records.';
+      setError(message);
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -232,9 +280,17 @@ const DuesImportPreviewModal = ({ isOpen, token, onClose }: Props) => {
           ) : (
             <div className="space-y-6">
               <div className="flex flex-col gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800 sm:flex-row sm:items-center sm:justify-between">
-                <span><strong>Preview only.</strong> No payment history has been added to SmartHOA.</span>
+                <span><strong>{importResult ? 'Import complete.' : 'Preview only.'}</strong> {importResult ? importResult.message : 'No payment history has been added to SmartHOA.'}</span>
                 <button onClick={reset} className="font-semibold underline underline-offset-2">Choose another file</button>
               </div>
+
+              {importResult && (
+                <div className="grid grid-cols-1 gap-4 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800 sm:grid-cols-3">
+                  <div><span className="block text-xs font-semibold uppercase tracking-wide text-green-700">Imported</span><strong className="mt-1 block text-lg">{importResult.summary.imported_entries} entries</strong></div>
+                  <div><span className="block text-xs font-semibold uppercase tracking-wide text-green-700">Recorded amount</span><strong className="mt-1 block text-lg">{formatPeso(importResult.summary.imported_amount)}</strong></div>
+                  <div><span className="block text-xs font-semibold uppercase tracking-wide text-green-700">Skipped duplicates</span><strong className="mt-1 block text-lg">{importResult.summary.duplicate_entries}</strong></div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
                 <SummaryCard label="Source rows" value={String(preview.summary.source_rows)} />
@@ -306,6 +362,18 @@ const DuesImportPreviewModal = ({ isOpen, token, onClose }: Props) => {
             >
               {isLoading ? <LoaderCircle className="animate-spin" size={18} /> : <FileSpreadsheet size={18} />}
               {isLoading ? 'Checking file...' : 'Create Preview'}
+            </button>
+          )}
+          {preview && !importResult && (
+            <button
+              onClick={importReadyEntries}
+              disabled={preview.summary.ready_entries === 0 || isImporting}
+              className={`flex items-center gap-2 rounded-xl px-5 py-2.5 font-semibold text-white transition-colors ${
+                preview.summary.ready_entries === 0 || isImporting ? 'cursor-not-allowed bg-brown/50' : 'bg-brown hover:bg-brown-dark'
+              }`}
+            >
+              {isImporting ? <LoaderCircle className="animate-spin" size={18} /> : <CheckCircle2 size={18} />}
+              {isImporting ? 'Importing history...' : `Import ${preview.summary.ready_entries} ready entries`}
             </button>
           )}
         </div>

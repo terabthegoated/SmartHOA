@@ -695,6 +695,7 @@ const Payments = () => {
         isOpen={isImportPreviewOpen}
         token={token}
         onClose={() => setIsImportPreviewOpen(false)}
+        onImported={() => { void fetchData(); }}
       />
     </div>
   );
