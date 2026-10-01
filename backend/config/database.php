@@ -16,6 +16,7 @@ class Database {
     private $username;
     private $password;
     private $port;
+    private $sslmode;
     public $conn;
 
     public function __construct() {
@@ -28,11 +29,14 @@ class Database {
         }
 
         // Assign from ENV or fallback to localhost defaults
-        $this->host = $_ENV['DB_HOST'] ?? "localhost";
-        $this->db_name = $_ENV['DB_NAME'] ?? "smarthoa_db";
-        $this->username = $_ENV['DB_USER'] ?? "root";
-        $this->password = $_ENV['DB_PASS'] ?? "";
-        $this->port = $_ENV['DB_PORT'] ?? "5432";
+        // Dotenv populates $_ENV locally. Render supplies values through the
+        // process environment, so support both without exposing any secrets.
+        $this->host = getenv('DB_HOST') ?: ($_ENV['DB_HOST'] ?? "localhost");
+        $this->db_name = getenv('DB_NAME') ?: ($_ENV['DB_NAME'] ?? "smarthoa_db");
+        $this->username = getenv('DB_USER') ?: ($_ENV['DB_USER'] ?? "root");
+        $this->password = getenv('DB_PASS') ?: ($_ENV['DB_PASS'] ?? "");
+        $this->port = getenv('DB_PORT') ?: ($_ENV['DB_PORT'] ?? "5432");
+        $this->sslmode = getenv('DB_SSLMODE') ?: ($_ENV['DB_SSLMODE'] ?? null);
     }
 
     public function getConnection() {
@@ -40,6 +44,9 @@ class Database {
         try {
             // Updated for Supabase (PostgreSQL)
             $dsn = "pgsql:host=" . $this->host . ";port=" . $this->port . ";dbname=" . $this->db_name;
+            if (!empty($this->sslmode)) {
+                $dsn .= ";sslmode=" . $this->sslmode;
+            }
             $this->conn = new PDO($dsn, $this->username, $this->password);
             $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         } catch(PDOException $exception) {

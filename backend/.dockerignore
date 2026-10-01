@@ -1,0 +1,12 @@
+.env
+.git
+.vscode
+vendor
+uploads
+secrets
+firebase-service-account.json
+test_db.php
+test_pooler.php
+test_users.php
+insert_test_users.php
+seed_properties.php
