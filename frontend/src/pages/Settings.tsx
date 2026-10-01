@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { User, Mail, Phone, Home, Save, Database, AlertTriangle, LoaderCircle } from 'lucide-react';
+import { User, Mail, Phone, Home, Save, Database, AlertTriangle, LoaderCircle, Bell, BellRing } from 'lucide-react';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
+import { enableWebPushNotifications, webPushPermission } from '../services/webPushNotifications';
 
 const Settings = () => {
   const { user, token } = useAuthStore();
@@ -13,6 +14,9 @@ const Settings = () => {
   const [demoMessage, setDemoMessage] = useState('');
   const [demoError, setDemoError] = useState('');
   const [demoCredentials, setDemoCredentials] = useState<{ password: string; accounts: { label: string; email: string }[] } | null>(null);
+  const [isEnablingNotifications, setIsEnablingNotifications] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState('');
+  const [notificationError, setNotificationError] = useState('');
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -102,6 +106,24 @@ const Settings = () => {
       setIsCreatingDemoData(false);
     }
   };
+
+  const enableDeviceNotifications = async () => {
+    if (!token) return;
+    setIsEnablingNotifications(true);
+    setNotificationMessage('');
+    setNotificationError('');
+
+    try {
+      await enableWebPushNotifications(token);
+      setNotificationMessage('Device notifications are on for this SmartHOA app.');
+    } catch (error) {
+      setNotificationError(error instanceof Error ? error.message : 'Unable to enable device notifications.');
+    } finally {
+      setIsEnablingNotifications(false);
+    }
+  };
+
+  const notificationPermission = webPushPermission();
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -238,6 +260,40 @@ const Settings = () => {
           </form>
         </div>
       </div>
+
+      <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
+          <div className="flex items-start gap-4">
+            <div className="w-11 h-11 shrink-0 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
+              {notificationPermission === 'granted' ? <BellRing size={21} /> : <Bell size={21} />}
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-800">Device notifications</h2>
+              <p className="text-sm text-gray-600 mt-1 max-w-xl">
+                Receive announcements, payment updates, reminders, and complaint updates on this device.
+                On iPhone, open SmartHOA from its Home Screen icon before turning notifications on.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={enableDeviceNotifications}
+            disabled={isEnablingNotifications || notificationPermission === 'granted'}
+            className="shrink-0 inline-flex justify-center items-center gap-2 bg-brown hover:bg-brown-dark disabled:bg-green-600 disabled:cursor-default text-white font-semibold py-3 px-5 rounded-xl transition-colors"
+          >
+            {isEnablingNotifications
+              ? 'Turning on...'
+              : notificationPermission === 'granted'
+                ? 'Notifications enabled'
+                : 'Turn on notifications'}
+          </button>
+        </div>
+        {(notificationMessage || notificationError) && (
+          <div className={`mx-6 mb-6 rounded-xl border p-4 text-sm font-semibold ${notificationError ? 'border-red-200 bg-red-50 text-red-700' : 'border-green-200 bg-green-50 text-green-700'}`}>
+            {notificationError || notificationMessage}
+          </div>
+        )}
+      </section>
 
       {user?.role === 'Super Administrator' && (
         <section className="bg-white rounded-2xl border border-amber-200 shadow-sm overflow-hidden">

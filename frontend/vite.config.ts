@@ -9,8 +9,12 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'service-worker.ts',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
+        id: '/',
         name: 'SmartHOA - Community Management',
         short_name: 'SmartHOA',
         description: 'Modern Homeowners Association Management System',

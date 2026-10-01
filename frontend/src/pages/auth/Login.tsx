@@ -6,6 +6,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useGoogleLogin } from '@react-oauth/google';
 import { API_BASE_URL } from '../../config/api';
 import { registerNativePushNotifications } from '../../services/pushNotifications';
+import { syncWebPushSubscription } from '../../services/webPushNotifications';
 import swrLogo from '../../assets/brand/swr-logo.png';
 
 const Login = () => {
@@ -30,6 +31,7 @@ const Login = () => {
         
         login(response.data.user, response.data.token);
         void registerNativePushNotifications(response.data.token);
+        void syncWebPushSubscription(response.data.token);
 
         const isOfficer = response.data.user.role === 'Super Administrator' || response.data.user.role === 'HOA Officer';
         navigate(isOfficer ? '/officer-dashboard' : '/resident-dashboard', { replace: true });
@@ -63,6 +65,7 @@ const Login = () => {
         // Save to Zustand and LocalStorage
         login(response.data.user, response.data.token);
         void registerNativePushNotifications(response.data.token);
+        void syncWebPushSubscription(response.data.token);
 
         // Redirect based on role
         if (response.data.user.role === 'Super Administrator' || response.data.user.role === 'HOA Officer') {

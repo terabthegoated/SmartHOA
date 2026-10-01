@@ -1,6 +1,7 @@
 <?php
 
 use Firebase\JWT\JWT;
+require_once __DIR__ . '/web_push.php';
 
 /**
  * Firebase Cloud Messaging delivery for SmartHOA Android devices.
@@ -88,9 +89,12 @@ function fcm_access_token($account) {
 }
 
 function send_fcm_push(PDO $db, array $recipientIds, $title, $message, $notificationType, $targetPath) {
+    // The same SmartHOA event can reach native Android devices through FCM and
+    // installed browser apps (including iPhone Home Screen PWAs) through Web Push.
+    $webPushResult = send_web_push($db, $recipientIds, $title, $message, $notificationType, $targetPath);
     $account = fcm_service_account();
     if (!$account || count($recipientIds) === 0) {
-        return array('configured' => false, 'sent' => 0);
+        return array('configured' => false, 'sent' => 0, 'web_sent' => $webPushResult['sent'] ?? 0);
     }
 
     try {
@@ -126,9 +130,9 @@ function send_fcm_push(PDO $db, array $recipientIds, $title, $message, $notifica
                 $disable->execute([$device['device_id']]);
             }
         }
-        return array('configured' => true, 'sent' => $sent);
+        return array('configured' => true, 'sent' => $sent, 'web_sent' => $webPushResult['sent'] ?? 0);
     } catch (Exception $e) {
         error_log('SmartHOA FCM delivery skipped: ' . $e->getMessage());
-        return array('configured' => true, 'sent' => 0, 'error' => $e->getMessage());
+        return array('configured' => true, 'sent' => 0, 'web_sent' => $webPushResult['sent'] ?? 0, 'error' => $e->getMessage());
     }
 }
