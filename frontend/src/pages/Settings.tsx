@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { User, Mail, Phone, Home, Save } from 'lucide-react';
+import { User, Mail, Phone, Home, Save, Database, AlertTriangle, LoaderCircle } from 'lucide-react';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
 
@@ -8,6 +8,11 @@ const Settings = () => {
   const { user, token } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [demoConfirmation, setDemoConfirmation] = useState('');
+  const [isCreatingDemoData, setIsCreatingDemoData] = useState(false);
+  const [demoMessage, setDemoMessage] = useState('');
+  const [demoError, setDemoError] = useState('');
+  const [demoCredentials, setDemoCredentials] = useState<{ password: string; accounts: { label: string; email: string }[] } | null>(null);
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -66,6 +71,35 @@ const Settings = () => {
       console.error("Failed to update profile", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const createDemoData = async () => {
+    if (demoConfirmation.trim() !== 'CREATE DEMO DATA') {
+      setDemoError('Type CREATE DEMO DATA exactly to continue.');
+      return;
+    }
+
+    setIsCreatingDemoData(true);
+    setDemoError('');
+    setDemoMessage('');
+
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/officer/seed_demo_data.php`,
+        { confirmation: 'CREATE_DEMO_DATA' },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setDemoMessage(response.data?.message || 'Demo data is ready.');
+      setDemoCredentials(response.data?.credentials || null);
+      setDemoConfirmation('');
+    } catch (error) {
+      const message = axios.isAxiosError(error)
+        ? error.response?.data?.message
+        : null;
+      setDemoError(message || 'Unable to create demo data. Please try again.');
+    } finally {
+      setIsCreatingDemoData(false);
     }
   };
 
@@ -204,6 +238,78 @@ const Settings = () => {
           </form>
         </div>
       </div>
+
+      {user?.role === 'Super Administrator' && (
+        <section className="bg-white rounded-2xl border border-amber-200 shadow-sm overflow-hidden">
+          <div className="p-6 border-b border-amber-100 bg-amber-50/70 flex items-start gap-4">
+            <div className="w-11 h-11 shrink-0 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+              <Database size={22} />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-800">Development &amp; Testing</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Create fictional records so every SmartHOA feature can be demonstrated before the public rollout.
+              </p>
+            </div>
+          </div>
+
+          <div className="p-6 space-y-5">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex gap-3 text-sm text-amber-900">
+              <AlertTriangle size={20} className="shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold">Testing only</p>
+                <p className="mt-1">
+                  This adds fictional DEMO residents, properties, dues, complaints, announcements, and in-app notifications.
+                  It never imports the HOA Dues Record, never deletes existing records, and can be safely run again.
+                </p>
+              </div>
+            </div>
+
+            {demoMessage && (
+              <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+                <p className="font-semibold">{demoMessage}</p>
+                {demoCredentials && (
+                  <div className="mt-3 pt-3 border-t border-green-200 space-y-1">
+                    <p>All demo accounts use password: <code className="font-bold">{demoCredentials.password}</code></p>
+                    {demoCredentials.accounts.map((account) => (
+                      <p key={account.email}>{account.label}: <code className="font-semibold">{account.email}</code></p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {demoError && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+                {demoError}
+              </div>
+            )}
+
+            <div className="max-w-md">
+              <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+                To create demo data, type CREATE DEMO DATA
+              </label>
+              <input
+                type="text"
+                value={demoConfirmation}
+                onChange={(event) => setDemoConfirmation(event.target.value)}
+                placeholder="CREATE DEMO DATA"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-brown focus:ring-1 focus:ring-brown outline-none"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={createDemoData}
+              disabled={isCreatingDemoData}
+              className="inline-flex items-center gap-2 bg-brown hover:bg-brown-dark disabled:bg-gray-400 text-white font-semibold py-3 px-5 rounded-xl transition-colors"
+            >
+              {isCreatingDemoData ? <LoaderCircle size={18} className="animate-spin" /> : <Database size={18} />}
+              {isCreatingDemoData ? 'Creating demo data...' : 'Create demo data'}
+            </button>
+          </div>
+        </section>
+      )}
     </div>
   );
 };

@@ -36,8 +36,8 @@ SET description = EXCLUDED.description,
 
 -- 4. System Settings
 INSERT INTO system_settings (setting_key, setting_value, description) VALUES
-('monthly_hoa_fee', '1500.00', 'Default monthly HOA fee amount.'),
-('penalty_rate', '0.05', '5% penalty rate for overdue payments.'),
+('monthly_hoa_fee', '325.00', 'Default monthly HOA fee amount, payable on or before the 16th.'),
+('penalty_rate', '0.10', '10% compounding interest applied to the total outstanding balance every 16th.'),
 ('community_name', 'Southwynd Subd', 'The official name of the HOA community.'),
 ('office_hours', 'Mon-Sat 9AM-5PM', 'HOA Management Office operating hours.'),
 ('ai_confidence_threshold', '0.80', 'Minimum confidence score for auto-categorization.')
