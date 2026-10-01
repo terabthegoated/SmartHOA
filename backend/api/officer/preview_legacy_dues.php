@@ -233,6 +233,9 @@ try {
                     $systemResidentName = trim($matchingResidents[0]['first_name'] . ' ' . $matchingResidents[0]['last_name']);
                 } elseif (count($property['residents']) === 0) {
                     $issues[] = 'This property has no assigned resident in SmartHOA.';
+                } elseif (count($property['residents']) === 1) {
+                    $systemResidentName = trim($property['residents'][0]['first_name'] . ' ' . $property['residents'][0]['last_name']);
+                    $issues[] = 'The sheet resident does not match the resident assigned to this property.';
                 } elseif (count($matchingResidents) > 1) {
                     $issues[] = 'More than one resident profile matches this property.';
                 } else {

@@ -15,6 +15,10 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
+const PREVIEW_PAGE_SIZE = 50;
+const STATUS_FILTERS = ['All', 'Ready', 'Review', 'No payment'] as const;
+type PreviewStatusFilter = typeof STATUS_FILTERS[number];
+
 interface DuesRecord {
   source_row: number;
   block: string;
@@ -155,6 +159,8 @@ const DuesImportPreviewModal = ({ isOpen, token, onClose, onImported }: Props) =
   const [isLoading, setIsLoading] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState('');
+  const [statusFilter, setStatusFilter] = useState<PreviewStatusFilter>('All');
+  const [currentPage, setCurrentPage] = useState(1);
 
   if (!isOpen) return null;
 
@@ -163,6 +169,8 @@ const DuesImportPreviewModal = ({ isOpen, token, onClose, onImported }: Props) =
     setPreview(null);
     setPreparedRecords([]);
     setImportResult(null);
+    setStatusFilter('All');
+    setCurrentPage(1);
     setError('');
   };
 
@@ -176,6 +184,8 @@ const DuesImportPreviewModal = ({ isOpen, token, onClose, onImported }: Props) =
     setPreview(null);
     setPreparedRecords([]);
     setImportResult(null);
+    setStatusFilter('All');
+    setCurrentPage(1);
     setError('');
   };
 
@@ -194,6 +204,8 @@ const DuesImportPreviewModal = ({ isOpen, token, onClose, onImported }: Props) =
       );
       setPreview(response.data);
       setPreparedRecords(records);
+      setStatusFilter('All');
+      setCurrentPage(1);
     } catch (requestError) {
       const message = axios.isAxiosError(requestError)
         ? requestError.response?.data?.message ?? 'SmartHOA could not prepare the dues preview.'
@@ -234,7 +246,18 @@ const DuesImportPreviewModal = ({ isOpen, token, onClose, onImported }: Props) =
     }
   };
 
-  const displayRows = preview?.rows.filter((row) => row.payment_count > 0).slice(0, 100) ?? [];
+  const filteredPreviewRows = preview?.rows.filter((row) => statusFilter === 'All' || row.status === statusFilter) ?? [];
+  const totalPages = Math.max(1, Math.ceil(filteredPreviewRows.length / PREVIEW_PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageStart = (safeCurrentPage - 1) * PREVIEW_PAGE_SIZE;
+  const displayRows = filteredPreviewRows.slice(pageStart, pageStart + PREVIEW_PAGE_SIZE);
+  const firstRowNumber = filteredPreviewRows.length === 0 ? 0 : pageStart + 1;
+  const lastRowNumber = Math.min(pageStart + displayRows.length, filteredPreviewRows.length);
+
+  const chooseStatusFilter = (nextFilter: PreviewStatusFilter) => {
+    setStatusFilter(nextFilter);
+    setCurrentPage(1);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm animate-in fade-in duration-200">
@@ -308,8 +331,28 @@ const DuesImportPreviewModal = ({ isOpen, token, onClose, onImported }: Props) =
 
               <div className="overflow-hidden rounded-2xl border border-gray-100">
                 <div className="border-b border-gray-100 bg-gray-50 px-5 py-4">
-                  <h4 className="font-bold text-gray-800">Payment rows</h4>
-                  <p className="mt-1 text-sm text-gray-500">Showing the first {displayRows.length} properties with recorded payments.</p>
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <h4 className="font-bold text-gray-800">Source-row review</h4>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Showing {firstRowNumber}–{lastRowNumber} of {filteredPreviewRows.length} rows. Use the filters to inspect every resident and property.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {STATUS_FILTERS.map((filter) => (
+                        <button
+                          key={filter}
+                          type="button"
+                          onClick={() => chooseStatusFilter(filter)}
+                          className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                            statusFilter === filter ? 'bg-brown text-white' : 'border border-gray-200 bg-white text-gray-600 hover:border-brown/40 hover:text-brown'
+                          }`}
+                        >
+                          {filter}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
                 <div className="max-h-[42vh] overflow-auto">
                   <table className="w-full min-w-[980px] text-left">
@@ -342,6 +385,27 @@ const DuesImportPreviewModal = ({ isOpen, token, onClose, onImported }: Props) =
                       ))}
                     </tbody>
                   </table>
+                </div>
+                <div className="flex flex-col gap-3 border-t border-gray-100 bg-gray-50 px-5 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                  <span className="text-gray-500">Page {safeCurrentPage} of {totalPages}</span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                      disabled={safeCurrentPage === 1}
+                      className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 font-semibold text-gray-600 transition-colors hover:border-brown/40 hover:text-brown disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                      disabled={safeCurrentPage === totalPages}
+                      className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 font-semibold text-gray-600 transition-colors hover:border-brown/40 hover:text-brown disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
