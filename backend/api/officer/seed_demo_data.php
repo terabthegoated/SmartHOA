@@ -72,7 +72,7 @@ function demo_data_find_or_create_resident($db, $userId, $propertyId, $firstName
         return $residentId;
     }
 
-    $create = $db->prepare("\n        INSERT INTO resident_profiles\n+            (user_id, property_id, first_name, last_name, contact_number, resident_type, resident_status, move_in_date)\n+        VALUES (?, ?, ?, ?, ?, ?, 'Active', CURRENT_DATE - INTERVAL '90 days')\n+        RETURNING resident_id\n+    ");
+    $create = $db->prepare("\n        INSERT INTO resident_profiles\n            (user_id, property_id, first_name, last_name, contact_number, resident_type, resident_status, move_in_date)\n        VALUES (?, ?, ?, ?, ?, ?, 'Active', CURRENT_DATE - INTERVAL '90 days')\n        RETURNING resident_id\n    ");
     $create->execute([$userId, $propertyId, $firstName, $lastName, $contactNumber, $residentType]);
     $createdResidents++;
     return $create->fetchColumn();
@@ -353,7 +353,7 @@ try {
             $find->execute([$demoComplaint['resident_id'], $demoComplaint['title']]);
             $complaintId = $find->fetchColumn();
             if (!$complaintId) {
-                $create = $db->prepare("\n                    INSERT INTO complaints\n+                        (resident_id, category_id, assigned_officer, title, description, complaint_status, priority_level,\n+                         priority_recommendation, priority_rule_code, priority_reason, created_at, updated_at)\n+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP - INTERVAL '3 days', CURRENT_TIMESTAMP)\n+                    RETURNING complaint_id\n+                ");
+                $create = $db->prepare("\n                    INSERT INTO complaints\n                        (resident_id, category_id, assigned_officer, title, description, complaint_status, priority_level,\n                         priority_recommendation, priority_rule_code, priority_reason, created_at, updated_at)\n                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP - INTERVAL '3 days', CURRENT_TIMESTAMP)\n                    RETURNING complaint_id\n                ");
                 $create->execute([
                     $demoComplaint['resident_id'], $demoComplaint['category_id'], $approvedBy,
                     $demoComplaint['title'], $demoComplaint['description'], $demoComplaint['status'],
