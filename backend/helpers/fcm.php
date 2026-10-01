@@ -7,15 +7,37 @@ use Firebase\JWT\JWT;
  * It is disabled until the server is configured with a Firebase service-account
  * JSON file, so notification creation never fails when FCM is unavailable.
  */
-function fcm_service_account() {
-    $path = $_ENV['FCM_SERVICE_ACCOUNT_PATH'] ?? '';
-    if ($path === '' || !is_readable($path)) {
-        return null;
-    }
-    $account = json_decode(file_get_contents($path), true);
+function fcm_environment_value($key) {
+    $value = getenv($key);
+    return $value !== false ? trim((string) $value) : trim((string) ($_ENV[$key] ?? ''));
+}
+
+function fcm_valid_service_account($account) {
     return is_array($account) && !empty($account['client_email']) && !empty($account['private_key']) && !empty($account['project_id'])
         ? $account
         : null;
+}
+
+function fcm_service_account() {
+    // Render cannot read a JSON file kept on a developer's computer. For the
+    // deployed API, store the service-account JSON as a base64 environment
+    // value. The file path remains supported for local development.
+    $encoded = fcm_environment_value('FCM_SERVICE_ACCOUNT_BASE64');
+    if ($encoded !== '') {
+        $json = base64_decode($encoded, true);
+        if ($json !== false) {
+            $account = fcm_valid_service_account(json_decode($json, true));
+            if ($account) {
+                return $account;
+            }
+        }
+    }
+
+    $path = fcm_environment_value('FCM_SERVICE_ACCOUNT_PATH');
+    if ($path === '' || !is_readable($path)) {
+        return null;
+    }
+    return fcm_valid_service_account(json_decode(file_get_contents($path), true));
 }
 
 function fcm_post($url, $body, $headers) {
