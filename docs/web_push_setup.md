@@ -11,10 +11,10 @@ Run `database/migrations/20261002_add_web_push_subscriptions.sql` in the Supabas
 From the SmartHOA project folder, run:
 
 ```powershell
-php -r "require 'backend/vendor/autoload.php'; print_r(\Minishlink\WebPush\VAPID::createVapidKeys());"
+node -e "const crypto=require('crypto');const key=crypto.createECDH('prime256v1');key.generateKeys();console.log('publicKey='+key.getPublicKey().toString('base64url'));console.log('privateKey='+key.getPrivateKey().toString('base64url'));"
 ```
 
-It prints a `publicKey` and `privateKey`. Treat the private key as a password. Do not post it in GitHub or share it.
+It prints a `publicKey` and `privateKey`. Treat the private key as a password. Do not post it in GitHub or share it. This uses Node's built-in cryptography and does not install any extra package.
 
 ## 3. Configure the deployed services
 
