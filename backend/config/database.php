@@ -50,8 +50,11 @@ class Database {
             $this->conn = new PDO($dsn, $this->username, $this->password);
             $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         } catch(PDOException $exception) {
+            // Keep connection details (which can include credentials) out of
+            // public API responses while preserving diagnostics in server logs.
+            error_log("SmartHOA database connection error: " . $exception->getMessage());
             http_response_code(500);
-            echo json_encode(["message" => "Connection error: " . $exception->getMessage()]);
+            echo json_encode(["message" => "Database connection is temporarily unavailable. Please try again later."]);
             exit();
         }
         return $this->conn;
