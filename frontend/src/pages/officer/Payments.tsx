@@ -75,6 +75,7 @@ const Payments = () => {
   const [isSendingReminders, setIsSendingReminders] = useState(false);
   const [reminderResult, setReminderResult] = useState<ReminderResult | null>(null);
   const [isRunningCollectionPolicy, setIsRunningCollectionPolicy] = useState(false);
+  const [isCollectionPolicyConfirmOpen, setIsCollectionPolicyConfirmOpen] = useState(false);
   const [collectionPolicyResult, setCollectionPolicyResult] = useState<CollectionPolicyResult | null>(null);
 
   // Generate form state
@@ -267,15 +268,16 @@ const Payments = () => {
     }
   };
 
+  const openCollectionPolicyConfirm = () => {
+    if (isRunningCollectionPolicy) return;
+    setCollectionPolicyResult(null);
+    setIsCollectionPolicyConfirmOpen(true);
+  };
+
   const handleRunCollectionPolicy = async () => {
     if (isRunningCollectionPolicy) return;
 
-    const shouldRun = window.confirm(
-      'Run the collection policy now? SmartHOA will create any missing current-month ₱325 dues bills, mark eligible unpaid dues as overdue, and send the appropriate in-app notices. Paid bills and receipts awaiting verification will not be changed.'
-    );
-    if (!shouldRun) return;
-
-    setCollectionPolicyResult(null);
+    setIsCollectionPolicyConfirmOpen(false);
     setIsRunningCollectionPolicy(true);
 
     try {
@@ -399,7 +401,7 @@ const Payments = () => {
             {isSendingReminders ? 'Sending reminders...' : 'Send payment reminders'}
           </button>
           <button
-            onClick={handleRunCollectionPolicy}
+            onClick={openCollectionPolicyConfirm}
             disabled={isRunningCollectionPolicy}
             className={`flex items-center justify-center gap-2 border font-semibold px-5 py-2.5 rounded-xl transition-colors shadow-sm ${
               isRunningCollectionPolicy
@@ -564,6 +566,69 @@ const Payments = () => {
           </table>
         </div>
       </div>
+
+      {isCollectionPolicyConfirmOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="collection-policy-title"
+        >
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-gray-100 bg-cream/60 px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brown/10 text-brown">
+                  <Gavel size={20} />
+                </div>
+                <div>
+                  <h3 id="collection-policy-title" className="font-bold text-gray-800">Run collection policy?</h3>
+                  <p className="text-xs text-gray-500">This processes the current SmartHOA collection cycle.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCollectionPolicyConfirmOpen(false)}
+                className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-white hover:text-gray-600"
+                aria-label="Close collection policy confirmation"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4 px-6 py-5 text-sm text-gray-600">
+              <p className="leading-6">
+                SmartHOA will review the current payment cycle and apply the Board-approved rules below.
+              </p>
+              <ul className="space-y-2 rounded-xl border border-gray-100 bg-gray-50 p-4 leading-5">
+                <li><span className="font-semibold text-gray-800">• Missing monthly bills:</span> creates one ₱325 HOA-dues bill for each active resident with an assigned property.</li>
+                <li><span className="font-semibold text-gray-800">• Unpaid bills after the 16th:</span> marks eligible bills as overdue and sends the appropriate in-app notice.</li>
+                <li><span className="font-semibold text-gray-800">• Compounding interest:</span> records the 10% assessment after the payment due date.</li>
+              </ul>
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900">
+                Payments already marked Paid and payments with a receipt awaiting verification will not be changed. Third-month cases are flagged for a hearing; no account is automatically frozen.
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setIsCollectionPolicyConfirmOpen(false)}
+                className="rounded-xl px-5 py-2.5 font-semibold text-gray-600 transition-colors hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleRunCollectionPolicy}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-brown px-5 py-2.5 font-semibold text-white transition-colors hover:bg-brown-dark"
+              >
+                <Gavel size={18} />
+                Run policy now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Verify Payment Modal */}
       {isVerifyModalOpen && verifyingPayment && (
