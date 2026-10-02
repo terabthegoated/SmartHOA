@@ -12,10 +12,10 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'service-worker.ts',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      includeAssets: ['smarthoa-app-icon.png', 'apple-touch-icon.png'],
       manifest: {
         id: '/',
-        name: 'SmartHOA - Community Management',
+        name: 'SmartHOA - Southwynd Residences',
         short_name: 'SmartHOA',
         description: 'Modern Homeowners Association Management System',
         theme_color: '#4A3728', // The brown color used in the app
