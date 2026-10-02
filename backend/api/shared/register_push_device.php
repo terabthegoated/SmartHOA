@@ -49,11 +49,12 @@ try {
 
     $database = new Database();
     $db = $database->getConnection();
-    $stmt = $db->prepare("\n+        INSERT INTO push_devices (user_id, fcm_token, platform, is_enabled)\n+        VALUES (?, ?, ?, TRUE)\n+        ON CONFLICT (fcm_token) DO UPDATE\n+        SET user_id = EXCLUDED.user_id,\n+            platform = EXCLUDED.platform,\n+            is_enabled = TRUE,\n+            updated_at = CURRENT_TIMESTAMP\n+    ");
+    $stmt = $db->prepare("\n        INSERT INTO push_devices (user_id, fcm_token, platform, is_enabled)\n        VALUES (?, ?, ?, TRUE)\n        ON CONFLICT (fcm_token) DO UPDATE\n        SET user_id = EXCLUDED.user_id,\n            platform = EXCLUDED.platform,\n            is_enabled = TRUE,\n            updated_at = CURRENT_TIMESTAMP\n    ");
     $stmt->execute([$decoded->data->user_id, $fcmToken, $platform]);
 
     echo json_encode(array('message' => 'Push device registered.'));
 } catch (Exception $e) {
+    error_log('SmartHOA push-device registration failed: ' . $e->getMessage());
     http_response_code(401);
     echo json_encode(array('message' => 'Unable to register push device.', 'error' => $e->getMessage()));
 }

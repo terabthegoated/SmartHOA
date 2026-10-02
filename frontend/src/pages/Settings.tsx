@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/authStore';
 import { User, Mail, Phone, Home, Save, Database, AlertTriangle, LoaderCircle, Bell, BellRing } from 'lucide-react';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
+import { Capacitor } from '@capacitor/core';
 import { enableWebPushNotifications, webPushPermission } from '../services/webPushNotifications';
 
 const Settings = () => {
@@ -124,6 +125,7 @@ const Settings = () => {
   };
 
   const notificationPermission = webPushPermission();
+  const isNativeApp = Capacitor.isNativePlatform();
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -270,23 +272,30 @@ const Settings = () => {
             <div>
               <h2 className="text-lg font-bold text-gray-800">Device notifications</h2>
               <p className="text-sm text-gray-600 mt-1 max-w-xl">
-                Receive announcements, payment updates, reminders, and complaint updates on this device.
-                On iPhone, open SmartHOA from its Home Screen icon before turning notifications on.
+                {isNativeApp
+                  ? 'On Android, SmartHOA requests notification permission when you sign in. If it was previously declined, enable Notifications for SmartHOA in Android Settings, then sign out and sign in again.'
+                  : 'Receive announcements, payment updates, reminders, and complaint updates on this device. On iPhone, open SmartHOA from its Home Screen icon before turning notifications on.'}
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={enableDeviceNotifications}
-            disabled={isEnablingNotifications || notificationPermission === 'granted'}
-            className="shrink-0 inline-flex justify-center items-center gap-2 bg-brown hover:bg-brown-dark disabled:bg-green-600 disabled:cursor-default text-white font-semibold py-3 px-5 rounded-xl transition-colors"
-          >
-            {isEnablingNotifications
-              ? 'Turning on...'
-              : notificationPermission === 'granted'
-                ? 'Notifications enabled'
-                : 'Turn on notifications'}
-          </button>
+          {isNativeApp ? (
+            <span className="shrink-0 inline-flex justify-center items-center gap-2 rounded-xl bg-cream px-5 py-3 text-sm font-semibold text-brown">
+              Managed by Android
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={enableDeviceNotifications}
+              disabled={isEnablingNotifications || notificationPermission === 'granted'}
+              className="shrink-0 inline-flex justify-center items-center gap-2 bg-brown hover:bg-brown-dark disabled:bg-green-600 disabled:cursor-default text-white font-semibold py-3 px-5 rounded-xl transition-colors"
+            >
+              {isEnablingNotifications
+                ? 'Turning on...'
+                : notificationPermission === 'granted'
+                  ? 'Notifications enabled'
+                  : 'Turn on notifications'}
+            </button>
+          )}
         </div>
         {(notificationMessage || notificationError) && (
           <div className={`mx-6 mb-6 rounded-xl border p-4 text-sm font-semibold ${notificationError ? 'border-red-200 bg-red-50 text-red-700' : 'border-green-200 bg-green-50 text-green-700'}`}>
