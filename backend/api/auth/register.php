@@ -23,9 +23,9 @@ if (
     exit();
 }
 
-if (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/', $data->password)) {
+if (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&_])[A-Za-z\d@$!%*?&_]{8,}$/', $data->password)) {
     http_response_code(400);
-    echo json_encode(array("message" => "Password must be at least 8 characters long and include an uppercase letter, a lowercase letter, a number, and a special character."));
+    echo json_encode(array("message" => "Password must be at least 8 characters long and include an uppercase letter, a lowercase letter, a number, and a special character such as _ or !."));
     exit();
 }
 

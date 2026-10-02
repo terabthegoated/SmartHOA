@@ -39,9 +39,9 @@ const Register = () => {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&_])[A-Za-z\d@$!%*?&_]{8,}$/;
     if (!strongPasswordRegex.test(formData.password)) {
-      setError('Password must be at least 8 characters long and include an uppercase letter, a lowercase letter, a number, and a special character.');
+      setError('Password must be at least 8 characters long and include an uppercase letter, a lowercase letter, a number, and a special character such as _ or !.');
       return;
     }
 
