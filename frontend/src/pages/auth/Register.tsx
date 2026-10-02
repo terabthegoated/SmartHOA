@@ -68,7 +68,7 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen bg-cream flex">
+    <div className="flex min-h-[100dvh] bg-cream">
       <div className="hidden lg:flex lg:w-1/2 bg-brown relative overflow-hidden flex-col justify-center items-start px-20">
         <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
         <div className="relative z-10 text-white space-y-6">
@@ -83,15 +83,15 @@ const Register = () => {
         </div>
       </div>
 
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
-        <div className="w-full max-w-lg bg-white p-10 rounded-3xl shadow-xl shadow-brown/5 animate-in fade-in slide-in-from-bottom-8 duration-700">
+      <div className="flex w-full items-start justify-center p-4 py-6 lg:w-1/2 lg:items-center lg:p-8">
+        <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl shadow-brown/5 animate-in fade-in slide-in-from-bottom-8 duration-700 sm:rounded-3xl sm:p-8 lg:p-10">
 
           <Link to="/" className="mb-6 block rounded-xl bg-cream p-2 ring-1 ring-brown/10 lg:hidden">
             <img src={swrLogo} alt="Southwynd San Pablo Homeowners Association" className="w-full h-auto" />
           </Link>
 
           <div className="mb-8">
-            <h3 className="text-3xl font-heading font-bold text-gray-800">Create Account</h3>
+            <h3 className="text-2xl font-heading font-bold text-gray-800 sm:text-3xl">Create Account</h3>
             <p className="text-gray-500 mt-2">Please fill in your details to register.</p>
           </div>
 
@@ -108,7 +108,7 @@ const Register = () => {
           )}
 
           <form onSubmit={handleRegister} className="space-y-5">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">First Name</label>
                 <div className="relative">
@@ -117,7 +117,7 @@ const Register = () => {
                     name="first_name"
                     value={formData.first_name}
                     onChange={handleChange}
-                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:border-brown focus:ring-1 focus:ring-brown outline-none transition-all"
+                    className="min-h-12 w-full rounded-xl border border-gray-200 py-3 pl-10 pr-4 outline-none transition-all focus:border-brown focus:ring-1 focus:ring-brown"
                     required
                   />
                   <User className="w-5 h-5 text-gray-400 absolute left-3 top-3.5" />
@@ -131,7 +131,7 @@ const Register = () => {
                     name="last_name"
                     value={formData.last_name}
                     onChange={handleChange}
-                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:border-brown focus:ring-1 focus:ring-brown outline-none transition-all"
+                    className="min-h-12 w-full rounded-xl border border-gray-200 py-3 pl-10 pr-4 outline-none transition-all focus:border-brown focus:ring-1 focus:ring-brown"
                     required
                   />
                   <User className="w-5 h-5 text-gray-400 absolute left-3 top-3.5" />
@@ -147,14 +147,14 @@ const Register = () => {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:border-brown focus:ring-1 focus:ring-brown outline-none transition-all"
+                  className="min-h-12 w-full rounded-xl border border-gray-200 py-3 pl-10 pr-4 outline-none transition-all focus:border-brown focus:ring-1 focus:ring-brown"
                   required
                 />
                 <Mail className="w-5 h-5 text-gray-400 absolute left-3 top-3.5" />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Password</label>
                 <div className="relative">
@@ -163,7 +163,7 @@ const Register = () => {
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
-                    className="w-full pl-10 pr-12 py-3 rounded-xl border border-gray-200 focus:border-brown focus:ring-1 focus:ring-brown outline-none transition-all"
+                    className="min-h-12 w-full rounded-xl border border-gray-200 py-3 pl-10 pr-12 outline-none transition-all focus:border-brown focus:ring-1 focus:ring-brown"
                     required
                     minLength={8}
                   />
@@ -185,7 +185,7 @@ const Register = () => {
                     type={showConfirmPassword ? "text" : "password"}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full pl-10 pr-12 py-3 rounded-xl border border-gray-200 focus:border-brown focus:ring-1 focus:ring-brown outline-none transition-all"
+                    className="min-h-12 w-full rounded-xl border border-gray-200 py-3 pl-10 pr-12 outline-none transition-all focus:border-brown focus:ring-1 focus:ring-brown"
                     required
                     minLength={8}
                   />
@@ -209,20 +209,20 @@ const Register = () => {
                   name="contact_number"
                   value={formData.contact_number}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:border-brown focus:ring-1 focus:ring-brown outline-none transition-all"
+                  className="min-h-12 w-full rounded-xl border border-gray-200 py-3 pl-10 pr-4 outline-none transition-all focus:border-brown focus:ring-1 focus:ring-brown"
                 />
                 <Phone className="w-5 h-5 text-gray-400 absolute left-3 top-3.5" />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 pt-2">
+            <div className="grid grid-cols-1 gap-4 pt-2 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Resident Type</label>
                 <select
                   name="resident_type"
                   value={formData.resident_type}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-brown focus:ring-1 focus:ring-brown outline-none bg-white"
+                  className="min-h-12 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 outline-none focus:border-brown focus:ring-1 focus:ring-brown"
                 >
                   <option value="Homeowner">Homeowner</option>
                   <option value="Renter">Renter</option>
@@ -234,7 +234,7 @@ const Register = () => {
                   name="property_use"
                   value={formData.property_use}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-brown focus:ring-1 focus:ring-brown outline-none bg-white"
+                  className="min-h-12 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 outline-none focus:border-brown focus:ring-1 focus:ring-brown"
                 >
                   <option value="Homeowner">Homeowner Occupied</option>
                   <option value="Renter">Renter Occupied</option>
@@ -248,14 +248,14 @@ const Register = () => {
             {formData.property_use === 'Renter' && (
               <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">The selected block and lot will be recorded as renter-occupied. The renter remains a regular SmartHOA resident account.</p>
             )}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Block</label>
-                <input type="text" name="block" value={formData.block} onChange={handleChange} className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-brown focus:ring-1 focus:ring-brown outline-none transition-all" required />
+                <input type="text" name="block" value={formData.block} onChange={handleChange} className="min-h-12 w-full rounded-xl border border-gray-200 px-4 py-3 outline-none transition-all focus:border-brown focus:ring-1 focus:ring-brown" required />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Lot</label>
-                <input type="text" name="lot" value={formData.lot} onChange={handleChange} className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-brown focus:ring-1 focus:ring-brown outline-none transition-all" required />
+                <input type="text" name="lot" value={formData.lot} onChange={handleChange} className="min-h-12 w-full rounded-xl border border-gray-200 px-4 py-3 outline-none transition-all focus:border-brown focus:ring-1 focus:ring-brown" required />
               </div>
             </div>
 
@@ -280,7 +280,7 @@ const Register = () => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className={`w-full text-white font-semibold py-3 rounded-xl transition-colors duration-200 ${isLoading ? 'bg-brown/70 cursor-not-allowed' : 'bg-brown hover:bg-brown-dark shadow-md shadow-brown/20'
+                className={`min-h-12 w-full rounded-xl py-3 font-semibold text-white transition-colors duration-200 ${isLoading ? 'bg-brown/70 cursor-not-allowed' : 'bg-brown hover:bg-brown-dark shadow-md shadow-brown/20'
                   }`}
               >
                 {isLoading ? 'REGISTERING...' : 'CREATE ACCOUNT'}

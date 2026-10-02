@@ -82,7 +82,7 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="flex min-h-[100dvh] bg-cream">
       {/* Left Side - Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-brown-dark text-white p-12 flex-col justify-between" style={{
         backgroundImage: 'linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px)',
@@ -107,18 +107,18 @@ const Login = () => {
       </div>
 
       {/* Right Side - Login Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-cream">
-        <div className="w-full max-w-md bg-white p-10 rounded-2xl shadow-sm border border-gray-100">
+      <div className="flex w-full items-start justify-center p-4 py-6 lg:w-1/2 lg:items-center lg:p-8">
+        <div className="w-full max-w-md rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:p-8 lg:p-10">
           <Link to="/" className="mb-6 block rounded-xl bg-cream p-2 ring-1 ring-brown/10 lg:hidden">
             <img src={swrLogo} alt="Southwynd San Pablo Homeowners Association" className="w-full h-auto" />
           </Link>
           <div className="flex justify-between items-center mb-2">
-            <h3 className="text-3xl font-heading font-bold">Welcome Back</h3>
+            <h3 className="text-2xl font-heading font-bold sm:text-3xl">Welcome Back</h3>
             <Link to="/" className="p-2 bg-gray-50 hover:bg-gray-100 text-gray-500 hover:text-brown rounded-xl transition-colors border border-gray-100" title="Back to Home">
               <Home size={20} />
             </Link>
           </div>
-          <p className="text-gray-500 mb-8">Please log in to your account.</p>
+          <p className="mb-6 text-gray-500 sm:mb-8">Please log in to your account.</p>
 
           <form onSubmit={handleLogin} className="space-y-6">
             {error && (
@@ -136,7 +136,7 @@ const Login = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email"
-                  className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-200 focus:border-brown focus:ring-1 focus:ring-brown outline-none transition-all"
+                  className="min-h-12 w-full rounded-lg border border-gray-200 py-3 pl-10 pr-4 outline-none transition-all focus:border-brown focus:ring-1 focus:ring-brown"
                   required
                 />
                 <svg className="w-5 h-5 text-gray-400 absolute left-3 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -155,7 +155,7 @@ const Login = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
-                  className="w-full pl-10 pr-12 py-3 rounded-lg border border-gray-200 focus:border-brown focus:ring-1 focus:ring-brown outline-none transition-all"
+                  className="min-h-12 w-full rounded-lg border border-gray-200 py-3 pl-10 pr-12 outline-none transition-all focus:border-brown focus:ring-1 focus:ring-brown"
                   required
                 />
                 <svg className="w-5 h-5 text-gray-400 absolute left-3 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -180,7 +180,7 @@ const Login = () => {
             <button
               type="submit"
               disabled={isLoading || isGoogleLoading}
-              className={`w-full text-white font-semibold py-3 rounded-xl transition-colors duration-200 ${
+              className={`min-h-12 w-full rounded-xl py-3 font-semibold text-white transition-colors duration-200 ${
                 isLoading || isGoogleLoading ? 'bg-brown/70 cursor-not-allowed' : 'bg-brown hover:bg-brown-dark'
               }`}
             >
@@ -197,7 +197,7 @@ const Login = () => {
               type="button"
               onClick={() => handleGoogleLogin()}
               disabled={isLoading || isGoogleLoading}
-              className="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 text-gray-700 font-semibold py-3 rounded-xl hover:bg-gray-50 transition-colors duration-200"
+              className="flex min-h-12 w-full items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white py-3 font-semibold text-gray-700 transition-colors duration-200 hover:bg-gray-50"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path

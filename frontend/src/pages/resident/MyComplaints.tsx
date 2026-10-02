@@ -241,16 +241,16 @@ const MyComplaints = () => {
 
       {/* New Complaint Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 pb-14 backdrop-blur-sm animate-in fade-in duration-200 sm:p-4">
+          <div className="flex max-h-[calc(100dvh-4rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl animate-in zoom-in-95 duration-200 sm:max-h-[90vh]">
+            <div className="flex shrink-0 items-center justify-between border-b border-gray-100 bg-gray-50 px-5 py-4 sm:px-6">
               <h3 className="font-bold text-gray-800">Submit a Complaint</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+              <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-white hover:text-gray-600" aria-label="Close complaint form">
                 <X size={20} />
               </button>
             </div>
             
-            <div className="p-6 space-y-4">
+            <div className="flex-1 space-y-4 overflow-y-auto p-5 sm:p-6">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Category</label>
                 <select 
@@ -290,7 +290,7 @@ const MyComplaints = () => {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Attach Evidence (Optional)</label>
-                <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:bg-gray-50 transition-colors bg-white group">
+                <label className="group flex h-28 w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-white transition-colors hover:bg-gray-50">
                   <div className="flex flex-col items-center justify-center">
                     <FileImage className="w-6 h-6 text-gray-400 group-hover:text-brown mb-1 transition-colors" />
                     <p className="text-xs text-gray-500 font-semibold">{attachment ? attachment.name : 'Upload an image'}</p>
@@ -305,17 +305,19 @@ const MyComplaints = () => {
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
+            <div className="grid shrink-0 grid-cols-2 gap-3 border-t border-gray-100 bg-gray-50 px-5 py-4 sm:px-6">
               <button 
+                type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="px-5 py-2.5 rounded-xl font-semibold text-gray-600 hover:bg-gray-200 transition-colors"
+                className="min-h-11 rounded-xl px-4 py-2.5 font-semibold text-gray-600 transition-colors hover:bg-gray-200"
               >
                 Cancel
               </button>
               <button 
+                type="button"
                 onClick={handleSubmit}
                 disabled={!title || !description || !categoryId || isSubmitting}
-                className={`px-5 py-2.5 rounded-xl font-semibold text-white flex items-center gap-2 transition-colors ${
+                className={`flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-semibold text-white transition-colors ${
                   !title || !description || !categoryId || isSubmitting ? 'bg-brown/50 cursor-not-allowed' : 'bg-brown hover:bg-brown-dark'
                 }`}
               >
@@ -328,16 +330,16 @@ const MyComplaints = () => {
 
       {/* View Complaint Modal */}
       {viewingComplaint && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 pb-14 backdrop-blur-sm animate-in fade-in duration-200 sm:p-4">
+          <div className="flex max-h-[calc(100dvh-4rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl animate-in zoom-in-95 duration-200 sm:max-h-[90vh]">
+            <div className="flex shrink-0 items-center justify-between border-b border-gray-100 bg-gray-50 px-5 py-4 sm:px-6">
               <h3 className="font-bold text-gray-800">Complaint Details</h3>
-              <button onClick={() => setViewingComplaint(null)} className="text-gray-400 hover:text-gray-600 transition-colors">
+              <button type="button" onClick={() => setViewingComplaint(null)} className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-white hover:text-gray-600" aria-label="Close complaint details">
                 <X size={20} />
               </button>
             </div>
             
-            <div className="p-6 space-y-6">
+            <div className="flex-1 space-y-6 overflow-y-auto p-5 sm:p-6">
               <div>
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex items-center gap-2">
