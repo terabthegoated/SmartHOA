@@ -6,6 +6,12 @@ import { API_BASE_URL } from '../config/api';
 let currentSessionToken: string | null = null;
 let listenersReady = false;
 
+function reportNativePushStatus(message: string, isError = false) {
+  window.dispatchEvent(new CustomEvent('smarthoa-native-push-status', {
+    detail: { message, isError }
+  }));
+}
+
 async function saveDeviceToken(fcmToken: string) {
   if (!currentSessionToken) return;
   await axios.post(`${API_BASE_URL}/api/shared/register_push_device.php`, {
@@ -28,7 +34,12 @@ export async function registerNativePushNotifications(sessionToken: string) {
   if (
     !Capacitor.isNativePlatform() ||
     import.meta.env.VITE_ENABLE_NATIVE_PUSH !== 'true'
-  ) return;
+  ) {
+    return {
+      message: 'This app update does not have Android notifications enabled. Install the newest SmartHOA app and try again.',
+      isError: true
+    };
+  }
   currentSessionToken = sessionToken;
 
   try {
@@ -36,25 +47,41 @@ export async function registerNativePushNotifications(sessionToken: string) {
     if (permission.receive === 'prompt') {
       permission = await PushNotifications.requestPermissions();
     }
-    if (permission.receive !== 'granted') return;
+    if (permission.receive !== 'granted') {
+      return {
+        message: 'Notifications are not allowed yet. Enable SmartHOA notifications in Android Settings, then try again.',
+        isError: true
+      };
+    }
 
     if (!listenersReady) {
       await PushNotifications.addListener('registration', async (token) => {
         try {
           await saveDeviceToken(token.value);
+          reportNativePushStatus('This Android phone is connected and can receive SmartHOA notifications.');
         } catch (error) {
           console.error('Unable to save the push device token.', error);
+          reportNativePushStatus('Android gave SmartHOA a device token, but it could not be saved. Check your internet connection and try again.', true);
         }
       });
       await PushNotifications.addListener('registrationError', (error) => {
         console.error('Push notification registration failed.', error);
+        reportNativePushStatus('Android could not create a notification token. Check your internet connection and try again.', true);
       });
       listenersReady = true;
     }
 
     await PushNotifications.register();
+    return {
+      message: 'Android permission is enabled. Connecting this phone to SmartHOA…',
+      isError: false
+    };
   } catch (error) {
     // A missing Firebase config should not block normal application sign-in.
     console.error('Push notification setup is unavailable.', error);
+    return {
+      message: 'Unable to start Android notifications. Please try again after checking your internet connection.',
+      isError: true
+    };
   }
 }

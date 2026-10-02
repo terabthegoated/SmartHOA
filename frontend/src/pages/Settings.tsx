@@ -5,6 +5,7 @@ import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
 import { Capacitor } from '@capacitor/core';
 import { enableWebPushNotifications, webPushPermission } from '../services/webPushNotifications';
+import { registerNativePushNotifications } from '../services/pushNotifications';
 
 const Settings = () => {
   const { user, token } = useAuthStore();
@@ -54,6 +55,19 @@ const Settings = () => {
       fetchProfile();
     }
   }, [token]);
+
+  useEffect(() => {
+    const showNativePushStatus = (event: Event) => {
+      const detail = (event as CustomEvent<{ message?: string; isError?: boolean }>).detail;
+      if (!detail?.message) return;
+      setNotificationMessage(detail.isError ? '' : detail.message);
+      setNotificationError(detail.isError ? detail.message : '');
+      setIsEnablingNotifications(false);
+    };
+
+    window.addEventListener('smarthoa-native-push-status', showNativePushStatus);
+    return () => window.removeEventListener('smarthoa-native-push-status', showNativePushStatus);
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -115,6 +129,13 @@ const Settings = () => {
     setNotificationError('');
 
     try {
+      if (Capacitor.isNativePlatform()) {
+        const result = await registerNativePushNotifications(token);
+        setNotificationMessage(result.message);
+        setNotificationError(result.isError ? result.message : '');
+        if (result.isError) setNotificationMessage('');
+        return;
+      }
       await enableWebPushNotifications(token);
       setNotificationMessage('Device notifications are on for this SmartHOA app.');
     } catch (error) {
@@ -273,15 +294,20 @@ const Settings = () => {
               <h2 className="text-lg font-bold text-gray-800">Device notifications</h2>
               <p className="text-sm text-gray-600 mt-1 max-w-xl">
                 {isNativeApp
-                  ? 'On Android, SmartHOA requests notification permission when you sign in. If it was previously declined, enable Notifications for SmartHOA in Android Settings, then sign out and sign in again.'
+                  ? 'Connect this Android phone to receive announcements, payment updates, reminders, and complaint updates. Android may ask for notification permission.'
                   : 'Receive announcements, payment updates, reminders, and complaint updates on this device. On iPhone, open SmartHOA from its Home Screen icon before turning notifications on.'}
               </p>
             </div>
           </div>
           {isNativeApp ? (
-            <span className="shrink-0 inline-flex justify-center items-center gap-2 rounded-xl bg-cream px-5 py-3 text-sm font-semibold text-brown">
-              Managed by Android
-            </span>
+            <button
+              type="button"
+              onClick={enableDeviceNotifications}
+              disabled={isEnablingNotifications}
+              className="shrink-0 inline-flex justify-center items-center gap-2 bg-brown hover:bg-brown-dark disabled:bg-gray-400 text-white font-semibold py-3 px-5 rounded-xl transition-colors"
+            >
+              {isEnablingNotifications ? 'Connecting...' : 'Connect notifications'}
+            </button>
           ) : (
             <button
               type="button"
