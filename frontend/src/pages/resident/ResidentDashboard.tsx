@@ -6,7 +6,7 @@ import { useAuthStore } from '../../store/authStore';
 import { API_BASE_URL } from '../../config/api';
 
 interface DuesSummary {
-  status: 'Paid' | 'Due' | 'Overdue' | 'Not applicable';
+  status: 'Paid' | 'Due' | 'Overdue' | 'Awaiting bill' | 'Not applicable';
   amount_due: number;
   base_dues: number;
   penalty_amount: number;
@@ -131,7 +131,9 @@ const ResidentDashboard = () => {
   const isOverdue = dues.status === 'Overdue';
   const isPaid = dues.status === 'Paid';
   const hasPendingDues = !isLoadingDues && (dues.status === 'Due' || isOverdue) && Number(dues.amount_due) > 0;
-  const displayedAmount = `₱${Number(dues.amount_due || 0).toLocaleString(undefined, {
+  const displayedAmount = dues.status === 'Awaiting bill' || dues.status === 'Not applicable'
+    ? '—'
+    : `₱${Number(dues.amount_due || 0).toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;

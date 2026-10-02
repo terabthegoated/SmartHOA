@@ -151,14 +151,22 @@ try {
         $periods[$periodKey]['base_amount'] = round($periods[$periodKey]['base_amount'] + $amount, 2);
     }
 
-    // The current month is always visible to the homeowner, even before the
-    // officer has generated a payment record for it.
-    if (!$currentMonthHasRecord) {
-        $periodKey = $dueDate->format('Y-m-d');
-        $periods[$periodKey] = [
-            'due_date' => $dueDate,
-            'base_amount' => 325.0,
-        ];
+    // A dashboard balance must always correspond to a bill the resident can
+    // open and pay in My Bills. Do not invent a current-month ₱325 amount
+    // before an officer or the collection policy has actually issued it.
+    if (!$currentMonthHasRecord && empty($periods)) {
+        echo json_encode([
+            'status' => 'Awaiting bill',
+            'amount_due' => 0,
+            'base_dues' => 0,
+            'penalty_amount' => 0,
+            'billing_label' => $today->format('F Y'),
+            'due_date' => $dueDate->format('Y-m-d'),
+            'months_overdue' => 0,
+            'collection_stage' => '',
+            'message' => 'No monthly HOA dues bill has been issued to your account yet.',
+        ]);
+        exit();
     }
     ksort($periods);
 
