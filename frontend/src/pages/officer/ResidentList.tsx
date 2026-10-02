@@ -82,13 +82,13 @@ const ResidentList = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
-      <div className="flex justify-between items-end">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-gray-800">Resident Directory</h1>
+          <h1 className="text-2xl font-heading font-bold text-gray-800 sm:text-3xl">Resident Directory</h1>
           <p className="text-gray-500 mt-2">Manage and view all residents within the community.</p>
         </div>
         
-        <div className="flex items-center bg-white rounded-xl px-4 py-2 w-72 border border-gray-200 focus-within:border-brown focus-within:ring-1 focus-within:ring-brown transition-all shadow-sm">
+        <div className="flex w-full items-center rounded-xl border border-gray-200 bg-white px-4 py-2 shadow-sm transition-all focus-within:border-brown focus-within:ring-1 focus-within:ring-brown sm:w-72">
           <Search className="w-5 h-5 text-gray-400 mr-3" />
           <input 
             type="text" 
@@ -100,7 +100,58 @@ const ResidentList = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="space-y-3 md:hidden">
+        {isLoading ? (
+          [...Array(3)].map((_, index) => (
+            <div key={index} className="h-60 animate-pulse rounded-2xl border border-gray-100 bg-white p-5 shadow-sm" />
+          ))
+        ) : filteredResidents.length === 0 ? (
+          <div className="rounded-2xl border border-gray-100 bg-white px-5 py-12 text-center text-gray-400 shadow-sm">
+            No residents found.
+          </div>
+        ) : (
+          filteredResidents.map((resident) => (
+            <article key={resident.resident_id} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-brown/20 bg-cream font-bold text-brown">
+                  {resident.first_name.charAt(0)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="font-bold text-gray-800">{resident.first_name} {resident.last_name}</h2>
+                    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
+                      resident.account_status === 'Active'
+                        ? 'border border-green-200 bg-green-50 text-green-700'
+                        : 'border border-red-200 bg-red-50 text-red-700'
+                    }`}>
+                      {resident.account_status}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    {resident.property_use === 'Airbnb' ? 'Homeowner · Airbnb Host' : resident.property_use === 'Renter' ? 'Renter-occupied property' : resident.resident_type || 'Unassigned Role'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-2 border-y border-gray-100 py-4 text-sm">
+                <p className="flex items-start gap-2 text-gray-600"><Mail size={15} className="mt-0.5 shrink-0 text-gray-400" /><span className="break-all">{resident.email}</span></p>
+                {resident.contact_number && <p className="flex items-center gap-2 text-gray-600"><Phone size={15} className="shrink-0 text-gray-400" />{resident.contact_number}</p>}
+                <p className="flex items-center gap-2 font-medium text-gray-700"><MapPin size={15} className="shrink-0 text-gray-400" />{resident.block && resident.lot ? `Blk ${resident.block}, Lot ${resident.lot}` : 'Property unassigned'}</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleOpenManage(resident)}
+                className="mt-4 min-h-11 w-full rounded-xl bg-brown/10 px-4 py-2.5 text-sm font-semibold text-brown transition-colors hover:bg-brown/20"
+              >
+                Manage resident
+              </button>
+            </article>
+          ))
+        )}
+      </div>
+
+      <div className="hidden overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm md:block">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -190,8 +241,8 @@ const ResidentList = () => {
 
       {/* Assignment Modal */}
       {isModalOpen && selectedResident && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 backdrop-blur-sm animate-in fade-in duration-200 sm:p-4">
+          <div className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-xl animate-in zoom-in-95 duration-200 sm:max-h-[90vh]">
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
               <h3 className="font-bold text-gray-800">Assign Property</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
@@ -199,7 +250,7 @@ const ResidentList = () => {
               </button>
             </div>
             
-            <div className="p-6 space-y-4">
+            <div className="space-y-4 overflow-y-auto p-5 sm:p-6">
               <div className="flex items-center gap-4 p-4 bg-cream rounded-xl border border-brown/10">
                 <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-brown font-bold shadow-sm">
                   {selectedResident.first_name.charAt(0)}
@@ -244,17 +295,17 @@ const ResidentList = () => {
               {propertyUse === 'Renter' && <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">This marks the property as renter-occupied without changing the selected resident's account role.</p>}
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
+            <div className="flex flex-col-reverse gap-2 border-t border-gray-100 bg-gray-50 px-5 py-4 sm:flex-row sm:justify-end sm:gap-3 sm:px-6">
               <button 
                 onClick={() => setIsModalOpen(false)}
-                className="px-5 py-2.5 rounded-xl font-semibold text-gray-600 hover:bg-gray-200 transition-colors"
+                className="min-h-11 rounded-xl px-5 py-2.5 font-semibold text-gray-600 transition-colors hover:bg-gray-200"
               >
                 Cancel
               </button>
               <button 
                 onClick={handleAssignProperty}
                 disabled={!blockInput || !lotInput || isAssigning}
-                className={`px-5 py-2.5 rounded-xl font-semibold text-white flex items-center gap-2 transition-colors ${
+                className={`flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 py-2.5 font-semibold text-white transition-colors ${
                   !blockInput || !lotInput || isAssigning ? 'bg-brown/50 cursor-not-allowed' : 'bg-brown hover:bg-brown-dark'
                 }`}
               >

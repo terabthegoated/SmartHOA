@@ -373,7 +373,7 @@ const Payments = () => {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-gray-800">Payment Management</h1>
+          <h1 className="text-2xl font-heading font-bold text-gray-800 sm:text-3xl">Payment Management</h1>
           <p className="text-gray-500 mt-2">Generate dues and monitor resident payments.</p>
         </div>
         
@@ -391,7 +391,7 @@ const Payments = () => {
           <button
             onClick={handleSendPaymentReminders}
             disabled={isSendingReminders}
-            className={`flex items-center justify-center gap-2 border font-semibold px-5 py-2.5 rounded-xl transition-colors shadow-sm ${
+            className={`flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-5 py-2.5 font-semibold shadow-sm transition-colors sm:w-auto ${
               isSendingReminders
                 ? 'cursor-not-allowed border-brown/20 bg-cream text-brown/60'
                 : 'border-brown/20 bg-cream text-brown hover:bg-brown hover:text-white'
@@ -403,7 +403,7 @@ const Payments = () => {
           <button
             onClick={openCollectionPolicyConfirm}
             disabled={isRunningCollectionPolicy}
-            className={`flex items-center justify-center gap-2 border font-semibold px-5 py-2.5 rounded-xl transition-colors shadow-sm ${
+            className={`flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-5 py-2.5 font-semibold shadow-sm transition-colors sm:w-auto ${
               isRunningCollectionPolicy
                 ? 'cursor-not-allowed border-brown/20 bg-cream text-brown/60'
                 : 'border-brown/20 bg-white text-brown hover:bg-cream'
@@ -414,21 +414,21 @@ const Payments = () => {
           </button>
           <button 
             onClick={exportToCSV}
-            className="flex items-center gap-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold px-5 py-2.5 rounded-xl transition-colors shadow-sm"
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-2.5 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 sm:w-auto"
           >
             <Download size={18} />
             Export CSV
           </button>
           <button
             onClick={() => setIsImportPreviewOpen(true)}
-            className="flex items-center gap-2 bg-white border border-brown/20 hover:bg-cream text-brown font-semibold px-5 py-2.5 rounded-xl transition-colors shadow-sm"
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-brown/20 bg-white px-5 py-2.5 font-semibold text-brown shadow-sm transition-colors hover:bg-cream sm:w-auto"
           >
             <FileSpreadsheet size={18} />
             Import 2026 Dues
           </button>
           <button 
             onClick={() => setIsGenerateModalOpen(true)}
-            className="flex items-center gap-2 bg-brown hover:bg-brown-dark text-white font-semibold px-5 py-2.5 rounded-xl transition-colors shadow-sm"
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brown px-5 py-2.5 font-semibold text-white shadow-sm transition-colors hover:bg-brown-dark sm:w-auto"
           >
             <Plus size={18} />
             Generate Bill
@@ -495,7 +495,64 @@ const Payments = () => {
         </div>
       )}
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="space-y-3 md:hidden">
+        {isLoading ? (
+          [...Array(3)].map((_, index) => (
+            <div key={index} className="h-52 animate-pulse rounded-2xl border border-gray-100 bg-white p-5 shadow-sm" />
+          ))
+        ) : filteredPayments.length === 0 ? (
+          <div className="rounded-2xl border border-gray-100 bg-white px-5 py-12 text-center text-gray-400 shadow-sm">
+            No payment records found.
+          </div>
+        ) : (
+          filteredPayments.map((payment) => (
+            <article key={payment.payment_id} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="font-bold text-gray-800">{payment.first_name} {payment.last_name}</h2>
+                  <p className="mt-0.5 text-sm text-gray-500">{payment.block && payment.lot ? `Blk ${payment.block}, Lot ${payment.lot}` : 'Property unassigned'}</p>
+                </div>
+                {getStatusBadge(payment.payment_status, payment.receipt_url)}
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3 border-y border-gray-100 py-4">
+                <div>
+                  <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400"><FileText size={14} /> Bill type</p>
+                  <p className="mt-1 font-semibold text-gray-700">{payment.type_name}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Amount</p>
+                  <p className="mt-1 text-lg font-bold text-gray-800">₱{parseFloat(payment.amount_due).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Due date</p>
+                  <p className="mt-1 font-semibold text-gray-700">{new Date(payment.due_date).toLocaleDateString()}</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                disabled={payment.payment_status === 'Paid' && !payment.receipt_url}
+                onClick={() => {
+                  setVerifyingPayment(payment);
+                  setIsVerifyModalOpen(true);
+                }}
+                className={`mt-4 flex min-h-11 w-full items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
+                  payment.payment_status === 'Paid'
+                    ? 'cursor-default border border-green-200 bg-green-50 text-green-700'
+                    : payment.receipt_url
+                      ? 'bg-blue-600 text-white shadow-sm hover:bg-blue-700'
+                      : 'bg-brown/10 text-brown hover:bg-brown/20'
+                }`}
+              >
+                {payment.payment_status === 'Paid' ? 'Settled' : payment.receipt_url ? 'Verify receipt' : 'View details'}
+              </button>
+            </article>
+          ))
+        )}
+      </div>
+
+      <div className="hidden overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm md:block">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>

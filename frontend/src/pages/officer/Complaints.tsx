@@ -225,12 +225,12 @@ const Complaints = () => {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
       <div className="flex flex-col gap-4 xl:flex-row xl:justify-between xl:items-end">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-gray-800">Complaint Queue</h1>
+          <h1 className="text-2xl font-heading font-bold text-gray-800 sm:text-3xl">Complaint Queue</h1>
           <p className="text-gray-500 mt-2">Manage and resolve community issues.</p>
         </div>
         
-        <div className="flex flex-wrap gap-3">
-          <div className="flex items-center bg-white rounded-xl px-4 py-2 w-72 border border-gray-200 focus-within:border-brown focus-within:ring-1 focus-within:ring-brown transition-all shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+          <div className="flex w-full items-center rounded-xl border border-gray-200 bg-white px-4 py-2 shadow-sm transition-all focus-within:border-brown focus-within:ring-1 focus-within:ring-brown sm:w-72">
             <Search className="w-5 h-5 text-gray-400 mr-3" />
             <input 
               type="text" 
@@ -240,7 +240,7 @@ const Complaints = () => {
               className="bg-transparent border-none outline-none w-full text-sm placeholder-gray-400"
             />
           </div>
-          <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 shadow-sm">
+          <div className="flex min-h-11 items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 shadow-sm sm:w-auto">
             <SlidersHorizontal size={16} className="text-gray-400" />
             <label htmlFor="priority-filter" className="sr-only">Filter by priority</label>
             <select
@@ -256,7 +256,7 @@ const Complaints = () => {
               <option value="Low">Low</option>
             </select>
           </div>
-          <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 shadow-sm">
+          <div className="flex min-h-11 items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 shadow-sm sm:w-auto">
             <label htmlFor="complaint-sort" className="sr-only">Sort complaints</label>
             <select
               id="complaint-sort"
@@ -270,7 +270,7 @@ const Complaints = () => {
           </div>
           <button 
             onClick={exportToCSV}
-            className="flex items-center gap-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold px-5 py-2.5 rounded-xl transition-colors shadow-sm"
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-2.5 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 sm:w-auto"
           >
             <Download size={18} />
             Export CSV
@@ -278,7 +278,59 @@ const Complaints = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="space-y-3 md:hidden">
+        {isLoading ? (
+          [...Array(3)].map((_, index) => (
+            <div key={index} className="h-60 animate-pulse rounded-2xl border border-gray-100 bg-white p-5 shadow-sm" />
+          ))
+        ) : filteredComplaints.length === 0 ? (
+          <div className="rounded-2xl border border-gray-100 bg-white px-5 py-12 text-center text-gray-400 shadow-sm">
+            No complaints found.
+          </div>
+        ) : (
+          filteredComplaints.map((complaint) => (
+            <article key={complaint.complaint_id} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-gray-400">{complaint.category_name}</span>
+                    <PriorityBadge priority={getCurrentPriority(complaint)} />
+                  </div>
+                  <h2 className="mt-2 font-bold text-gray-800">{complaint.title}</h2>
+                </div>
+                {getStatusBadge(complaint.complaint_status)}
+              </div>
+
+              <div className="mt-4 space-y-3 border-y border-gray-100 py-4 text-sm">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Resident</p>
+                  <p className="mt-1 font-semibold text-gray-700">{complaint.first_name} {complaint.last_name}</p>
+                  <p className="text-gray-500">{complaint.block && complaint.lot ? `Blk ${complaint.block}, Lot ${complaint.lot}` : 'Property unassigned'}</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <PriorityBadge priority={complaint.priority_recommendation} />
+                  <span className="text-xs text-gray-500">DSS recommendation</span>
+                  {hasOfficerOverride(complaint) && <span className="inline-flex items-center gap-1 text-xs font-medium text-brown"><ShieldAlert size={13} /> Officer override</span>}
+                </div>
+                <div className="flex items-center justify-between gap-3 text-xs text-gray-500">
+                  <span>{new Date(complaint.created_at).toLocaleDateString()}</span>
+                  {complaint.file_url && <span className="inline-flex items-center gap-1 text-brown"><FileImage size={13} /> Attachment</span>}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => openComplaintReview(complaint)}
+                className="mt-4 min-h-11 w-full rounded-xl bg-brown/10 px-4 py-2.5 text-sm font-semibold text-brown transition-colors hover:bg-brown/20"
+              >
+                Review complaint
+              </button>
+            </article>
+          ))
+        )}
+      </div>
+
+      <div className="hidden overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm md:block">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>

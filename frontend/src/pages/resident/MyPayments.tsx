@@ -109,13 +109,13 @@ const MyPayments = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
-      <div className="flex justify-between items-end">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-gray-800">My Bills & Payments</h1>
+          <h1 className="text-2xl font-heading font-bold text-gray-800 sm:text-3xl">My Bills & Payments</h1>
           <p className="text-gray-500 mt-2">View your outstanding balances and payment history.</p>
         </div>
         
-        <div className="flex items-center bg-white rounded-xl px-4 py-2 w-72 border border-gray-200 focus-within:border-brown focus-within:ring-1 focus-within:ring-brown transition-all shadow-sm">
+        <div className="flex w-full items-center rounded-xl border border-gray-200 bg-white px-4 py-2 shadow-sm transition-all focus-within:border-brown focus-within:ring-1 focus-within:ring-brown sm:w-72">
           <Search className="w-5 h-5 text-gray-400 mr-3" />
           <input 
             type="text" 
@@ -127,7 +127,63 @@ const MyPayments = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="space-y-3 md:hidden">
+        {isLoading ? (
+          [...Array(3)].map((_, index) => (
+            <div key={index} className="h-48 animate-pulse rounded-2xl border border-gray-100 bg-white p-5 shadow-sm" />
+          ))
+        ) : filteredPayments.length === 0 ? (
+          <div className="rounded-2xl border border-gray-100 bg-white px-5 py-12 text-center text-gray-400 shadow-sm">
+            No bills found for your account.
+          </div>
+        ) : (
+          filteredPayments.map((payment) => (
+            <article key={payment.payment_id} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <FileText size={17} className="shrink-0 text-brown" />
+                    <h2 className="font-bold text-gray-800">{payment.type_name}</h2>
+                  </div>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {new Date(payment.billing_month).toLocaleDateString('default', { month: 'long', year: 'numeric' })}
+                  </p>
+                </div>
+                {getStatusBadge(payment.payment_status, payment.has_receipt)}
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3 border-y border-gray-100 py-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Amount</p>
+                  <p className="mt-1 text-lg font-bold text-gray-800">₱{parseFloat(payment.amount_due).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Due date</p>
+                  <p className="mt-1 font-semibold text-gray-700">{new Date(payment.due_date).toLocaleDateString()}</p>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                {payment.payment_status === 'Paid' ? (
+                  <span className="inline-flex rounded-lg bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-500">Settled</span>
+                ) : payment.has_receipt ? (
+                  <span className="inline-flex rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-600">Under Review</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenUpload(payment)}
+                    className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brown px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brown-dark"
+                  >
+                    <UploadCloud size={17} /> Pay Bill
+                  </button>
+                )}
+              </div>
+            </article>
+          ))
+        )}
+      </div>
+
+      <div className="hidden overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm md:block">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -194,8 +250,8 @@ const MyPayments = () => {
 
       {/* Upload Receipt Modal */}
       {isModalOpen && selectedPayment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 backdrop-blur-sm animate-in fade-in duration-200 sm:p-4">
+          <div className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-xl animate-in zoom-in-95 duration-200 sm:max-h-[90vh]">
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
               <h3 className="font-bold text-gray-800">Submit Payment</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
@@ -203,7 +259,7 @@ const MyPayments = () => {
               </button>
             </div>
             
-            <div className="p-6 space-y-4">
+            <div className="space-y-4 overflow-y-auto p-5 sm:p-6">
               <div className="bg-cream p-4 rounded-xl border border-brown/10">
                 <p className="text-sm text-gray-500 font-semibold mb-1">Total Amount Due</p>
                 <h2 className="text-3xl font-bold text-brown">₱{parseFloat(selectedPayment.amount_due).toLocaleString(undefined, { minimumFractionDigits: 2 })}</h2>
@@ -238,17 +294,17 @@ const MyPayments = () => {
             </div>
 
             {!uploadSuccess && (
-              <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
+              <div className="flex flex-col-reverse gap-2 border-t border-gray-100 bg-gray-50 px-5 py-4 sm:flex-row sm:justify-end sm:gap-3 sm:px-6">
                 <button 
                   onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2.5 rounded-xl font-semibold text-gray-600 hover:bg-gray-200 transition-colors"
+                  className="min-h-11 rounded-xl px-5 py-2.5 font-semibold text-gray-600 transition-colors hover:bg-gray-200"
                 >
                   Cancel
                 </button>
                 <button 
                   onClick={handleUploadReceipt}
                   disabled={!receiptFile || isUploading}
-                  className={`px-5 py-2.5 rounded-xl font-semibold text-white flex items-center gap-2 transition-colors ${
+                  className={`flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 py-2.5 font-semibold text-white transition-colors ${
                     !receiptFile || isUploading ? 'bg-brown/50 cursor-not-allowed' : 'bg-brown hover:bg-brown-dark'
                   }`}
                 >

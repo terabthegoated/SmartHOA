@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import TopNavbar from './TopNavbar';
+import MobileBottomNav from './MobileBottomNav';
 import { useUIStore } from '../../store/uiStore';
 
 const DashboardLayout = () => {
@@ -19,9 +20,10 @@ const DashboardLayout = () => {
       <Sidebar />
       <div className="flex-1 md:ml-64 flex flex-col w-full min-w-0">
         <TopNavbar />
-        <main className="p-4 md:p-8 flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto p-4 pb-24 md:p-8 md:pb-8">
           <Outlet />
         </main>
+        <MobileBottomNav />
       </div>
     </div>
   );

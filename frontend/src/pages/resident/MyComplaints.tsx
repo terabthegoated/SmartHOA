@@ -175,14 +175,14 @@ const MyComplaints = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
-      <div className="flex justify-between items-end">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-gray-800">My Complaints</h1>
+          <h1 className="text-2xl font-heading font-bold text-gray-800 sm:text-3xl">My Complaints</h1>
           <p className="text-gray-500 mt-2">Submit issues and track their resolution status.</p>
         </div>
         
-        <div className="flex gap-4">
-          <div className="flex items-center bg-white rounded-xl px-4 py-2 w-72 border border-gray-200 focus-within:border-brown focus-within:ring-1 focus-within:ring-brown transition-all shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex w-full items-center rounded-xl border border-gray-200 bg-white px-4 py-2 shadow-sm transition-all focus-within:border-brown focus-within:ring-1 focus-within:ring-brown sm:w-72">
             <Search className="w-5 h-5 text-gray-400 mr-3" />
             <input 
               type="text" 
@@ -194,7 +194,7 @@ const MyComplaints = () => {
           </div>
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 bg-brown hover:bg-brown-dark text-white font-semibold px-5 py-2.5 rounded-xl transition-colors shadow-sm"
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brown px-5 py-2.5 font-semibold text-white shadow-sm transition-colors hover:bg-brown-dark sm:w-auto"
           >
             <Plus size={18} />
             File a Report
