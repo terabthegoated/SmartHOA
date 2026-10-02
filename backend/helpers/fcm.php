@@ -120,7 +120,10 @@ function send_fcm_push(PDO $db, array $recipientIds, $title, $message, $notifica
                 'token' => $device['fcm_token'],
                 'notification' => array('title' => $title, 'body' => $message),
                 'data' => array('type' => (string) $notificationType, 'target_path' => (string) $targetPath),
-                'android' => array('priority' => 'high')
+                'android' => array(
+                    'priority' => 'high',
+                    'notification' => array('channel_id' => 'smarthoa_alerts')
+                )
             ));
             list($status, $response) = fcm_post(
                 'https://fcm.googleapis.com/v1/projects/' . rawurlencode($account['project_id']) . '/messages:send',

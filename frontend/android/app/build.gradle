@@ -7,8 +7,8 @@ android {
         applicationId "com.southwynd.smarthoa"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 3
-        versionName "1.1.1"
+        versionCode 4
+        versionName "1.1.2"
         ndk {
             // Package a universal testing APK that can run on real Android
             // phones as well as emulators.

@@ -54,6 +54,18 @@ export async function registerNativePushNotifications(sessionToken: string) {
       };
     }
 
+    // Android 8+ lets users control this "SmartHOA Alerts" category in their
+    // system settings. A high-importance channel makes new announcements and
+    // account updates visible as alerts rather than silent background items.
+    await PushNotifications.createChannel({
+      id: 'smarthoa_alerts',
+      name: 'SmartHOA Alerts',
+      description: 'Announcements, payments, reminders, and complaint updates',
+      importance: 4,
+      visibility: 1,
+      vibration: true
+    });
+
     if (!listenersReady) {
       await PushNotifications.addListener('registration', async (token) => {
         try {

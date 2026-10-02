@@ -9,6 +9,13 @@ const config: CapacitorConfig = {
   // blocking that local HTTP request as mixed content.
   server: {
     androidScheme: 'http'
+  },
+  plugins: {
+    PushNotifications: {
+      // Android needs this to display an incoming FCM notification while the
+      // SmartHOA app is currently open, not only after it is backgrounded.
+      presentationOptions: ['sound', 'alert', 'banner', 'list']
+    }
   }
 };
 
