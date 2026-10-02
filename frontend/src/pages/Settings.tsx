@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { User, Mail, Phone, Home, Save, Database, AlertTriangle, LoaderCircle, Bell, BellRing } from 'lucide-react';
+import { User, Mail, Phone, Home, Save, Database, AlertTriangle, LoaderCircle, Bell, BellRing, KeyRound } from 'lucide-react';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
 import { Capacitor } from '@capacitor/core';
@@ -19,6 +19,9 @@ const Settings = () => {
   const [isEnablingNotifications, setIsEnablingNotifications] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
   const [notificationError, setNotificationError] = useState('');
+  const [isSendingPasswordReset, setIsSendingPasswordReset] = useState(false);
+  const [passwordResetMessage, setPasswordResetMessage] = useState('');
+  const [passwordResetError, setPasswordResetError] = useState('');
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -142,6 +145,26 @@ const Settings = () => {
       setNotificationError(error instanceof Error ? error.message : 'Unable to enable device notifications.');
     } finally {
       setIsEnablingNotifications(false);
+    }
+  };
+
+  const sendPasswordResetEmail = async () => {
+    if (!formData.email) return;
+
+    setIsSendingPasswordReset(true);
+    setPasswordResetMessage('');
+    setPasswordResetError('');
+
+    try {
+      const response = await axios.post(`${API_BASE_URL}/api/auth/request_password_reset.php`, {
+        email: formData.email,
+      });
+      setPasswordResetMessage(response.data?.message || 'If an account matches this email, a password-reset link has been sent.');
+    } catch (error) {
+      const message = axios.isAxiosError(error) ? error.response?.data?.message : null;
+      setPasswordResetError(message || 'Unable to send a password-reset link. Please try again.');
+    } finally {
+      setIsSendingPasswordReset(false);
     }
   };
 
@@ -283,6 +306,36 @@ const Settings = () => {
           </form>
         </div>
       </div>
+
+      <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
+          <div className="flex items-start gap-4">
+            <div className="w-11 h-11 shrink-0 rounded-xl bg-brown/10 text-brown flex items-center justify-center">
+              <KeyRound size={21} />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-800">Password &amp; sign-in</h2>
+              <p className="text-sm text-gray-600 mt-1 max-w-xl">
+                Send a secure, one-time password-reset link to <span className="font-semibold text-gray-800">{formData.email || 'your registered email address'}</span>. The link expires after 30 minutes.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={sendPasswordResetEmail}
+            disabled={isSendingPasswordReset || !formData.email}
+            className="shrink-0 inline-flex justify-center items-center gap-2 bg-brown hover:bg-brown-dark disabled:bg-gray-400 text-white font-semibold py-3 px-5 rounded-xl transition-colors"
+          >
+            <Mail size={18} />
+            {isSendingPasswordReset ? 'Sending link...' : 'Reset my password'}
+          </button>
+        </div>
+        {(passwordResetMessage || passwordResetError) && (
+          <div className={`mx-6 mb-6 rounded-xl border p-4 text-sm font-semibold ${passwordResetError ? 'border-red-200 bg-red-50 text-red-700' : 'border-green-200 bg-green-50 text-green-700'}`}>
+            {passwordResetError || passwordResetMessage}
+          </div>
+        )}
+      </section>
 
       <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
