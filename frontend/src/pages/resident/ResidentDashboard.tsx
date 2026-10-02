@@ -25,6 +25,10 @@ interface Announcement {
   created_at?: string;
 }
 
+interface ComplaintSummary {
+  active_count: number;
+}
+
 const formatAnnouncementDate = (announcement: Announcement) => {
   const date = new Date(announcement.publish_date || announcement.created_at || '');
   if (Number.isNaN(date.getTime())) return 'Recently published';
@@ -66,6 +70,8 @@ const ResidentDashboard = () => {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [isLoadingAnnouncements, setIsLoadingAnnouncements] = useState(true);
   const [announcementsUnavailable, setAnnouncementsUnavailable] = useState(false);
+  const [activeComplaintCount, setActiveComplaintCount] = useState(0);
+  const [isLoadingComplaints, setIsLoadingComplaints] = useState(true);
 
   useEffect(() => {
     let isCurrent = true;
@@ -92,6 +98,33 @@ const ResidentDashboard = () => {
     };
 
     void fetchDues();
+    return () => { isCurrent = false; };
+  }, [token]);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    const fetchComplaintSummary = async () => {
+      if (!token) {
+        if (isCurrent) setIsLoadingComplaints(false);
+        return;
+      }
+
+      try {
+        const response = await axios.get<ComplaintSummary>(`${API_BASE_URL}/api/resident/get_complaint_summary.php`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (isCurrent) {
+          setActiveComplaintCount(Number(response.data?.active_count || 0));
+        }
+      } catch (error) {
+        console.error('Unable to load active complaint count.', error);
+      } finally {
+        if (isCurrent) setIsLoadingComplaints(false);
+      }
+    };
+
+    void fetchComplaintSummary();
     return () => { isCurrent = false; };
   }, [token]);
 
@@ -174,15 +207,15 @@ const ResidentDashboard = () => {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
+        <Link to="/my-complaints" className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 transition-colors hover:bg-orange-50/30">
           <div className="p-4 bg-orange-50 text-orange-600 rounded-xl">
             <FileText size={24} />
           </div>
           <div>
             <p className="text-sm text-gray-500 font-semibold mb-1">Active Complaints</p>
-            <h3 className="text-2xl font-bold text-gray-800">1</h3>
+            <h3 className="text-2xl font-bold text-gray-800">{isLoadingComplaints ? '...' : activeComplaintCount}</h3>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Recent Announcements */}

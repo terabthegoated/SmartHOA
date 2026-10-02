@@ -17,12 +17,16 @@ function password_reset_generic_message(): string {
     return 'If an account matches that email address, a password-reset link has been sent.';
 }
 
+function password_reset_email_is_configured(): bool {
+    return (bool) (password_reset_env('RESEND_API_KEY') && password_reset_env('EMAIL_FROM'));
+}
+
 function password_reset_send_email(string $recipient, string $token): bool {
     $apiKey = password_reset_env('RESEND_API_KEY');
     $from = password_reset_env('EMAIL_FROM');
     $appBaseUrl = rtrim(password_reset_env('APP_BASE_URL', 'https://smart-hoa-sigma.vercel.app'), '/');
 
-    if (!$apiKey || !$from) {
+    if (!password_reset_email_is_configured()) {
         error_log('SmartHOA password reset email is not configured: RESEND_API_KEY or EMAIL_FROM is missing.');
         return false;
     }
