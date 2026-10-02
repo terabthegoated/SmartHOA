@@ -93,7 +93,12 @@ function send_fcm_push(PDO $db, array $recipientIds, $title, $message, $notifica
     // installed browser apps (including iPhone Home Screen PWAs) through Web Push.
     $webPushResult = send_web_push($db, $recipientIds, $title, $message, $notificationType, $targetPath);
     $account = fcm_service_account();
-    if (!$account || count($recipientIds) === 0) {
+    if (!$account) {
+        error_log('SmartHOA FCM skipped: no valid Firebase service account is configured.');
+        return array('configured' => false, 'sent' => 0, 'web_sent' => $webPushResult['sent'] ?? 0);
+    }
+    if (count($recipientIds) === 0) {
+        error_log('SmartHOA FCM skipped: this event has no recipient accounts.');
         return array('configured' => false, 'sent' => 0, 'web_sent' => $webPushResult['sent'] ?? 0);
     }
 
@@ -104,6 +109,7 @@ function send_fcm_push(PDO $db, array $recipientIds, $title, $message, $notifica
         $stmt->execute($recipientIds);
         $devices = $stmt->fetchAll(PDO::FETCH_ASSOC);
         if (count($devices) === 0) {
+            error_log('SmartHOA FCM skipped: no enabled Android device is linked to an event recipient.');
             return array('configured' => true, 'sent' => 0);
         }
 
@@ -125,11 +131,13 @@ function send_fcm_push(PDO $db, array $recipientIds, $title, $message, $notifica
                 $sent++;
                 continue;
             }
+            error_log('SmartHOA FCM delivery failed with HTTP status ' . $status . '.');
             if ($status === 404 || strpos($response, 'UNREGISTERED') !== false) {
                 $disable = $db->prepare("UPDATE push_devices SET is_enabled = FALSE, updated_at = CURRENT_TIMESTAMP WHERE device_id = ?");
                 $disable->execute([$device['device_id']]);
             }
         }
+        error_log('SmartHOA FCM delivery completed: sent ' . $sent . ' of ' . count($devices) . ' Android notification(s).');
         return array('configured' => true, 'sent' => $sent, 'web_sent' => $webPushResult['sent'] ?? 0);
     } catch (Exception $e) {
         error_log('SmartHOA FCM delivery skipped: ' . $e->getMessage());
