@@ -30,6 +30,10 @@ const ResidentList = () => {
   const [propertyUse, setPropertyUse] = useState<'Homeowner' | 'Renter' | 'Airbnb'>('Homeowner');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
+  const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
+  const [emailMessage, setEmailMessage] = useState('');
+  const [emailError, setEmailError] = useState('');
 
   const fetchData = async () => {
     try {
@@ -51,6 +55,9 @@ const ResidentList = () => {
     setBlockInput(resident.block || '');
     setLotInput(resident.lot || '');
     setPropertyUse(resident.property_use || (resident.resident_type === 'Renter' ? 'Renter' : 'Homeowner'));
+    setEmailInput(resident.email);
+    setEmailMessage('');
+    setEmailError('');
     setIsModalOpen(true);
   };
 
@@ -72,6 +79,53 @@ const ResidentList = () => {
       console.error("Failed to assign property", error);
     } finally {
       setIsAssigning(false);
+    }
+  };
+
+  const handleUpdateEmail = async () => {
+    if (!selectedResident) return;
+
+    const nextEmail = emailInput.trim().toLowerCase();
+    if (!/^\S+@\S+\.\S+$/.test(nextEmail)) {
+      setEmailError('Enter a valid email address.');
+      setEmailMessage('');
+      return;
+    }
+
+    if (nextEmail === selectedResident.email.toLowerCase()) {
+      setEmailError('Enter a different email address to update this resident.');
+      setEmailMessage('');
+      return;
+    }
+
+    const isConfirmed = window.confirm(
+      `Confirm that you verified ${selectedResident.first_name} ${selectedResident.last_name}'s identity. Update their SmartHOA email to ${nextEmail}? Any existing password-reset links will stop working.`
+    );
+    if (!isConfirmed) return;
+
+    setIsUpdatingEmail(true);
+    setEmailMessage('');
+    setEmailError('');
+
+    try {
+      const response = await axios.post(`${API_BASE_URL}/api/officer/update_resident_email.php`, {
+        resident_id: selectedResident.resident_id,
+        email: nextEmail,
+      }, { headers: { Authorization: `Bearer ${token}` } });
+
+      setEmailInput(nextEmail);
+      setSelectedResident((current) => current ? { ...current, email: nextEmail } : current);
+      setResidents((current) => current.map((resident) =>
+        resident.resident_id === selectedResident.resident_id
+          ? { ...resident, email: nextEmail }
+          : resident
+      ));
+      setEmailMessage(response.data?.message || 'Resident email updated.');
+    } catch (error) {
+      const message = axios.isAxiosError(error) ? error.response?.data?.message : null;
+      setEmailError(message || 'Unable to update the resident email. Please try again.');
+    } finally {
+      setIsUpdatingEmail(false);
     }
   };
 
@@ -239,12 +293,12 @@ const ResidentList = () => {
         </div>
       </div>
 
-      {/* Assignment Modal */}
+      {/* Resident management modal */}
       {isModalOpen && selectedResident && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 backdrop-blur-sm animate-in fade-in duration-200 sm:p-4">
           <div className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-xl animate-in zoom-in-95 duration-200 sm:max-h-[90vh]">
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-              <h3 className="font-bold text-gray-800">Assign Property</h3>
+              <h3 className="font-bold text-gray-800">Manage Resident</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
                 <X size={20} />
               </button>
@@ -255,11 +309,36 @@ const ResidentList = () => {
                 <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-brown font-bold shadow-sm">
                   {selectedResident.first_name.charAt(0)}
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="font-bold text-gray-800">{selectedResident.first_name} {selectedResident.last_name}</p>
-                  <p className="text-sm text-gray-500">{selectedResident.email}</p>
+                  <p className="truncate text-sm text-gray-500">{selectedResident.email}</p>
                 </div>
               </div>
+
+              <section className="rounded-xl border border-brown/15 bg-brown/5 p-4">
+                <div className="flex items-start gap-3">
+                  <Mail size={18} className="mt-0.5 shrink-0 text-brown" />
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-semibold text-gray-800">Account email</h4>
+                    <p className="mt-1 text-xs leading-5 text-gray-600">Verify the resident’s identity before changing this. Existing password-reset links will be cancelled.</p>
+                  </div>
+                </div>
+                <label className="sr-only" htmlFor="resident-account-email">Resident email address</label>
+                <input
+                  id="resident-account-email"
+                  type="email"
+                  value={emailInput}
+                  onChange={(event) => {
+                    setEmailInput(event.target.value);
+                    setEmailMessage('');
+                    setEmailError('');
+                  }}
+                  className="mt-3 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition-all focus:border-brown focus:ring-1 focus:ring-brown"
+                  placeholder="resident@example.com"
+                />
+                {emailMessage && <p className="mt-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs font-medium text-green-700">{emailMessage}</p>}
+                {emailError && <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{emailError}</p>}
+              </section>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -295,22 +374,33 @@ const ResidentList = () => {
               {propertyUse === 'Renter' && <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">This marks the property as renter-occupied without changing the selected resident's account role.</p>}
             </div>
 
-            <div className="flex flex-col-reverse gap-2 border-t border-gray-100 bg-gray-50 px-5 py-4 sm:flex-row sm:justify-end sm:gap-3 sm:px-6">
+            <div className="flex flex-col gap-2 border-t border-gray-100 bg-gray-50 px-5 py-4 sm:flex-row sm:justify-between sm:gap-3 sm:px-6">
               <button 
                 onClick={() => setIsModalOpen(false)}
                 className="min-h-11 rounded-xl px-5 py-2.5 font-semibold text-gray-600 transition-colors hover:bg-gray-200"
               >
                 Cancel
               </button>
-              <button 
-                onClick={handleAssignProperty}
-                disabled={!blockInput || !lotInput || isAssigning}
-                className={`flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 py-2.5 font-semibold text-white transition-colors ${
-                  !blockInput || !lotInput || isAssigning ? 'bg-brown/50 cursor-not-allowed' : 'bg-brown hover:bg-brown-dark'
-                }`}
-              >
-                {isAssigning ? 'Assigning...' : <><CheckCircle2 size={18} /> Confirm Assignment</>}
-              </button>
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={handleUpdateEmail}
+                  disabled={isUpdatingEmail}
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-brown bg-white px-5 py-2.5 font-semibold text-brown transition-colors hover:bg-brown/10 disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400"
+                >
+                  <Mail size={18} />
+                  {isUpdatingEmail ? 'Updating...' : 'Update email'}
+                </button>
+                <button
+                  onClick={handleAssignProperty}
+                  disabled={!blockInput || !lotInput || isAssigning}
+                  className={`flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 py-2.5 font-semibold text-white transition-colors ${
+                    !blockInput || !lotInput || isAssigning ? 'bg-brown/50 cursor-not-allowed' : 'bg-brown hover:bg-brown-dark'
+                  }`}
+                >
+                  {isAssigning ? 'Assigning...' : <><CheckCircle2 size={18} /> Confirm Assignment</>}
+                </button>
+              </div>
             </div>
           </div>
         </div>
