@@ -75,7 +75,19 @@ function password_reset_send_email(string $recipient, string $token): bool {
     curl_close($curl);
 
     if ($response === false || $status < 200 || $status >= 300) {
-        error_log('SmartHOA password reset email failed with HTTP ' . $status . ($error ? ': ' . $error : '.'));
+        $providerMessage = '';
+        if (is_string($response) && $response !== '') {
+            $decodedResponse = json_decode($response, true);
+            if (is_array($decodedResponse)) {
+                $providerMessage = trim((string) ($decodedResponse['message'] ?? $decodedResponse['code'] ?? ''));
+            }
+        }
+
+        error_log(
+            'SmartHOA password reset email failed with HTTP ' . $status
+            . ($error ? ': ' . $error : '')
+            . ($providerMessage ? ' Brevo: ' . substr($providerMessage, 0, 300) : '.')
+        );
         return false;
     }
 
