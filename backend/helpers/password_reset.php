@@ -18,16 +18,17 @@ function password_reset_generic_message(): string {
 }
 
 function password_reset_email_is_configured(): bool {
-    return (bool) (password_reset_env('RESEND_API_KEY') && password_reset_env('EMAIL_FROM'));
+    return (bool) (password_reset_env('BREVO_API_KEY') && password_reset_env('EMAIL_FROM'));
 }
 
 function password_reset_send_email(string $recipient, string $token): bool {
-    $apiKey = password_reset_env('RESEND_API_KEY');
+    $apiKey = password_reset_env('BREVO_API_KEY');
     $from = password_reset_env('EMAIL_FROM');
+    $fromName = password_reset_env('EMAIL_FROM_NAME', 'SmartHOA');
     $appBaseUrl = rtrim(password_reset_env('APP_BASE_URL', 'https://smart-hoa-sigma.vercel.app'), '/');
 
     if (!password_reset_email_is_configured()) {
-        error_log('SmartHOA password reset email is not configured: RESEND_API_KEY or EMAIL_FROM is missing.');
+        error_log('SmartHOA password reset email is not configured: BREVO_API_KEY or EMAIL_FROM is missing.');
         return false;
     }
 
@@ -44,19 +45,25 @@ function password_reset_send_email(string $recipient, string $token): bool {
         . '<p>This secure link can be used once and expires in 30 minutes. If you did not request it, you can safely ignore this email.</p>';
 
     $payload = json_encode([
-        'from' => $from,
-        'to' => [$recipient],
+        'sender' => [
+            'name' => $fromName,
+            'email' => $from,
+        ],
+        'to' => [[
+            'email' => $recipient,
+        ]],
         'subject' => 'Reset your SmartHOA password',
         'html' => $html,
     ]);
 
-    $curl = curl_init('https://api.resend.com/emails');
+    $curl = curl_init('https://api.brevo.com/v3/smtp/email');
     curl_setopt_array($curl, [
         CURLOPT_POST => true,
         CURLOPT_POSTFIELDS => $payload,
         CURLOPT_HTTPHEADER => [
-            'Authorization: Bearer ' . $apiKey,
+            'api-key: ' . $apiKey,
             'Content-Type: application/json',
+            'Accept: application/json',
         ],
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT => 15,
