@@ -2,7 +2,9 @@
 
 This relay sends SmartHOA password-reset emails from the Gmail account that
 owns the Apps Script project. It is intended for the low volume of password
-reset messages, and avoids the outbound SMTP connection block on Render.
+reset messages, and avoids the outbound SMTP connection block on Render. The
+script uses `MailApp`, which requests permission to send email only; it does
+not need access to read or delete messages in the Gmail mailbox.
 
 ## Google Apps Script setup
 

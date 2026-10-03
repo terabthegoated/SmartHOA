@@ -28,7 +28,9 @@ function doPost(event) {
       return jsonResponse_({ ok: false, error: 'Invalid email request.' });
     }
 
-    GmailApp.sendEmail(recipient, subject, textContent, {
+    // MailApp asks only for permission to send email. Do not replace this
+    // with GmailApp: GmailApp requests access to the complete Gmail mailbox.
+    MailApp.sendEmail(recipient, subject, textContent, {
       htmlBody: htmlContent,
       name: senderName || 'SmartHOA',
     });
