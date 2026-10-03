@@ -112,13 +112,19 @@ const Login = () => {
           <Link to="/" className="mb-6 block rounded-xl bg-cream p-2 ring-1 ring-brown/10 lg:hidden">
             <img src={swrLogo} alt="Southwynd San Pablo Homeowners Association" className="w-full h-auto" />
           </Link>
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="text-2xl font-heading font-bold sm:text-3xl">Welcome Back</h3>
-            <Link to="/" className="p-2 bg-gray-50 hover:bg-gray-100 text-gray-500 hover:text-brown rounded-xl transition-colors border border-gray-100" title="Back to Home">
-              <Home size={20} />
+          <div className="mb-6 flex items-start justify-between gap-4 sm:mb-8">
+            <div>
+              <h3 className="text-2xl font-heading font-bold sm:text-3xl">Welcome Back</h3>
+              <p className="mt-2 text-gray-500">Please log in to your account.</p>
+            </div>
+            <Link
+              to="/"
+              className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-brown/20 bg-cream px-4 py-2.5 text-sm font-semibold text-brown transition-colors hover:bg-brown/10"
+            >
+              <Home size={18} />
+              Home
             </Link>
           </div>
-          <p className="mb-6 text-gray-500 sm:mb-8">Please log in to your account.</p>
 
           <form onSubmit={handleLogin} className="space-y-6">
             {error && (
