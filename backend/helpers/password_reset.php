@@ -1,10 +1,5 @@
 <?php
 
-require_once __DIR__ . '/../vendor/autoload.php';
-
-use PHPMailer\PHPMailer\Exception;
-use PHPMailer\PHPMailer\PHPMailer;
-
 function password_reset_env(string $name, ?string $default = null): ?string {
     $value = getenv($name);
     if ($value !== false && $value !== '') {
@@ -24,32 +19,24 @@ function password_reset_generic_message(): string {
 }
 
 function password_reset_email_is_configured(): bool {
-    return (bool) (
-        password_reset_env('GMAIL_SMTP_USER')
-        && password_reset_env('GMAIL_SMTP_APP_PASSWORD')
-        && password_reset_env('EMAIL_FROM')
-    );
+    $relayUrl = password_reset_env('GOOGLE_APPS_SCRIPT_RELAY_URL');
+    $relaySecret = password_reset_env('GOOGLE_APPS_SCRIPT_RELAY_SECRET');
+
+    return is_string($relayUrl)
+        && filter_var($relayUrl, FILTER_VALIDATE_URL)
+        && str_starts_with(strtolower($relayUrl), 'https://')
+        && is_string($relaySecret)
+        && strlen($relaySecret) >= 24;
 }
 
 function password_reset_send_email(string $recipient, string $token): bool {
-    $smtpUser = password_reset_env('GMAIL_SMTP_USER');
-    $smtpPassword = preg_replace('/\s+/', '', (string) password_reset_env('GMAIL_SMTP_APP_PASSWORD'));
-    $from = password_reset_env('EMAIL_FROM');
+    $relayUrl = password_reset_env('GOOGLE_APPS_SCRIPT_RELAY_URL');
+    $relaySecret = password_reset_env('GOOGLE_APPS_SCRIPT_RELAY_SECRET');
     $fromName = password_reset_env('EMAIL_FROM_NAME', 'SmartHOA');
     $appBaseUrl = rtrim(password_reset_env('APP_BASE_URL', 'https://smart-hoa-sigma.vercel.app'), '/');
 
     if (!password_reset_email_is_configured()) {
-        error_log('SmartHOA password reset email is not configured: Gmail SMTP settings or EMAIL_FROM is missing.');
-        return false;
-    }
-
-    if (!filter_var($smtpUser, FILTER_VALIDATE_EMAIL) || !filter_var($from, FILTER_VALIDATE_EMAIL)) {
-        error_log('SmartHOA password reset email is not configured with valid Gmail sender addresses.');
-        return false;
-    }
-
-    if (strcasecmp($smtpUser, $from) !== 0) {
-        error_log('SmartHOA password reset email sender must match the Gmail SMTP account.');
+        error_log('SmartHOA password reset email is not configured: Google Apps Script relay settings are missing.');
         return false;
     }
 
@@ -60,29 +47,44 @@ function password_reset_send_email(string $recipient, string $token): bool {
         . '<p><a href="' . $safeResetUrl . '">Reset my password</a></p>'
         . '<p>This secure link can be used once and expires in 30 minutes. If you did not request it, you can safely ignore this email.</p>';
 
-    try {
-        $mail = new PHPMailer(true);
-        $mail->isSMTP();
-        $mail->Host = 'smtp.gmail.com';
-        $mail->SMTPAuth = true;
-        $mail->Username = $smtpUser;
-        $mail->Password = $smtpPassword;
-        // Render could not establish a connection through Gmail's STARTTLS
-        // port (587), so use Gmail's alternate implicit-TLS SMTP endpoint.
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-        $mail->Port = 465;
-        $mail->Timeout = 20;
-        $mail->CharSet = 'UTF-8';
-        $mail->setFrom($from, $fromName);
-        $mail->addAddress($recipient);
-        $mail->isHTML(true);
-        $mail->Subject = 'Reset your SmartHOA password';
-        $mail->Body = $html;
-        $mail->AltBody = "We received a request to reset your SmartHOA password. Open this link within 30 minutes: {$resetUrl}";
-        $mail->send();
-        return true;
-    } catch (Exception $exception) {
-        error_log('SmartHOA password reset email failed through Gmail SMTP: ' . substr($exception->getMessage(), 0, 300));
+    $payload = json_encode([
+        'secret' => $relaySecret,
+        'recipient' => $recipient,
+        'subject' => 'Reset your SmartHOA password',
+        'textContent' => "We received a request to reset your SmartHOA password. Open this link within 30 minutes: {$resetUrl}",
+        'htmlContent' => $html,
+        'senderName' => $fromName,
+    ], JSON_UNESCAPED_SLASHES);
+
+    if ($payload === false) {
+        error_log('SmartHOA password reset email could not create the relay request.');
         return false;
     }
+
+    $request = curl_init($relayUrl);
+    curl_setopt_array($request, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $payload,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: application/json'],
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_MAXREDIRS => 3,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_TIMEOUT => 25,
+        CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
+    ]);
+
+    $response = curl_exec($request);
+    $statusCode = (int) curl_getinfo($request, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($request);
+    curl_close($request);
+
+    $result = is_string($response) ? json_decode($response, true) : null;
+    if ($response === false || $statusCode < 200 || $statusCode >= 300 || !is_array($result) || ($result['ok'] ?? false) !== true) {
+        $reason = $curlError !== '' ? $curlError : "HTTP {$statusCode}";
+        error_log('SmartHOA password reset email failed through Google Apps Script relay: ' . substr($reason, 0, 300));
+        return false;
+    }
+
+    return true;
 }

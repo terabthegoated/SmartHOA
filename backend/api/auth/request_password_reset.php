@@ -30,7 +30,7 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
 $database = new Database();
 
 if (!password_reset_email_is_configured()) {
-    error_log('SmartHOA password reset email is not configured: BREVO_API_KEY or EMAIL_FROM is missing.');
+    error_log('SmartHOA password reset email is not configured: Google Apps Script relay settings are missing.');
     http_response_code(503);
     echo json_encode(['message' => 'Password-reset email is temporarily unavailable. Please contact the HOA office.']);
     exit();
