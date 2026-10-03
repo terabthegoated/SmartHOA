@@ -381,33 +381,31 @@ const ResidentList = () => {
               {propertyUse === 'Renter' && <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">This marks the property as renter-occupied without changing the selected resident's account role.</p>}
             </div>
 
-            <div className="flex flex-col gap-2 border-t border-gray-100 bg-gray-50 px-5 py-4 sm:flex-row sm:justify-between sm:gap-3 sm:px-6">
+            <div className="grid grid-cols-1 gap-2 border-t border-gray-100 bg-gray-50 px-5 py-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-3">
               <button 
                 onClick={() => { setIsModalOpen(false); setIsEmailConfirmationOpen(false); }}
-                className="min-h-11 rounded-xl px-5 py-2.5 font-semibold text-gray-600 transition-colors hover:bg-gray-200"
+                className="min-h-11 w-full rounded-xl px-5 py-2.5 font-semibold text-gray-600 transition-colors hover:bg-gray-200"
               >
                 Cancel
               </button>
-              <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={requestEmailUpdate}
-                  disabled={isUpdatingEmail}
-                  className="flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-brown bg-white px-5 py-2.5 font-semibold text-brown transition-colors hover:bg-brown/10 disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400"
-                >
-                  <Mail size={18} />
-                  {isUpdatingEmail ? 'Updating...' : 'Update email'}
-                </button>
-                <button
-                  onClick={handleAssignProperty}
-                  disabled={!blockInput || !lotInput || isAssigning}
-                  className={`flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 py-2.5 font-semibold text-white transition-colors ${
-                    !blockInput || !lotInput || isAssigning ? 'bg-brown/50 cursor-not-allowed' : 'bg-brown hover:bg-brown-dark'
-                  }`}
-                >
-                  {isAssigning ? 'Assigning...' : <><CheckCircle2 size={18} /> Confirm Assignment</>}
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={requestEmailUpdate}
+                disabled={isUpdatingEmail}
+                className="flex min-h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-brown bg-white px-5 py-2.5 font-semibold text-brown transition-colors hover:bg-brown/10 disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400"
+              >
+                <Mail size={18} />
+                {isUpdatingEmail ? 'Updating...' : 'Update email'}
+              </button>
+              <button
+                onClick={handleAssignProperty}
+                disabled={!blockInput || !lotInput || isAssigning}
+                className={`flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-5 py-2.5 font-semibold text-white transition-colors sm:col-span-2 lg:col-span-1 ${
+                  !blockInput || !lotInput || isAssigning ? 'bg-brown/50 cursor-not-allowed' : 'bg-brown hover:bg-brown-dark'
+                }`}
+              >
+                {isAssigning ? 'Assigning...' : <><CheckCircle2 size={18} /> Confirm Assignment</>}
+              </button>
             </div>
 
             {isEmailConfirmationOpen && (
