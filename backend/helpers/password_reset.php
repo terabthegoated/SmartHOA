@@ -33,7 +33,7 @@ function password_reset_email_is_configured(): bool {
 
 function password_reset_send_email(string $recipient, string $token): bool {
     $smtpUser = password_reset_env('GMAIL_SMTP_USER');
-    $smtpPassword = password_reset_env('GMAIL_SMTP_APP_PASSWORD');
+    $smtpPassword = preg_replace('/\s+/', '', (string) password_reset_env('GMAIL_SMTP_APP_PASSWORD'));
     $from = password_reset_env('EMAIL_FROM');
     $fromName = password_reset_env('EMAIL_FROM_NAME', 'SmartHOA');
     $appBaseUrl = rtrim(password_reset_env('APP_BASE_URL', 'https://smart-hoa-sigma.vercel.app'), '/');
