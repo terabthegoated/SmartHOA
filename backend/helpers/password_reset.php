@@ -67,8 +67,11 @@ function password_reset_send_email(string $recipient, string $token): bool {
         $mail->SMTPAuth = true;
         $mail->Username = $smtpUser;
         $mail->Password = $smtpPassword;
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        $mail->Port = 587;
+        // Render could not establish a connection through Gmail's STARTTLS
+        // port (587), so use Gmail's alternate implicit-TLS SMTP endpoint.
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+        $mail->Port = 465;
+        $mail->Timeout = 20;
         $mail->CharSet = 'UTF-8';
         $mail->setFrom($from, $fromName);
         $mail->addAddress($recipient);
