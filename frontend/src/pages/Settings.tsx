@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { User, Mail, Phone, Home, Save, Database, AlertTriangle, LoaderCircle, Bell, BellRing, KeyRound } from 'lucide-react';
+import { User, Mail, Phone, Home, Save, Database, AlertTriangle, LoaderCircle, Bell, BellRing, KeyRound, LogOut } from 'lucide-react';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
 import { Capacitor } from '@capacitor/core';
@@ -8,7 +8,7 @@ import { enableWebPushNotifications, webPushPermission } from '../services/webPu
 import { registerNativePushNotifications } from '../services/pushNotifications';
 
 const Settings = () => {
-  const { user, token } = useAuthStore();
+  const { user, token, logout } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [demoConfirmation, setDemoConfirmation] = useState('');
@@ -381,6 +381,28 @@ const Settings = () => {
             {notificationError || notificationMessage}
           </div>
         )}
+      </section>
+
+      <section className="bg-white rounded-2xl border border-red-100 shadow-sm overflow-hidden">
+        <div className="p-6 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="w-11 h-11 shrink-0 rounded-xl bg-red-50 text-red-600 flex items-center justify-center">
+              <LogOut size={21} />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-800">Log out</h2>
+              <p className="text-sm text-gray-600 mt-1 max-w-xl">Sign out of SmartHOA on this device. You can sign back in anytime.</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={logout}
+            className="shrink-0 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-5 py-3 font-semibold text-red-700 transition-colors hover:bg-red-50"
+          >
+            <LogOut size={18} />
+            Log out
+          </button>
+        </div>
       </section>
 
       {user?.role === 'Super Administrator' && (
