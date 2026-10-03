@@ -1,12 +1,18 @@
 <?php
 
+require_once __DIR__ . '/../vendor/autoload.php';
+
+use PHPMailer\PHPMailer\Exception;
+use PHPMailer\PHPMailer\PHPMailer;
+
 function password_reset_env(string $name, ?string $default = null): ?string {
     $value = getenv($name);
     if ($value !== false && $value !== '') {
-        return $value;
+        return trim($value);
     }
 
-    return $_ENV[$name] ?? $default;
+    $environmentValue = $_ENV[$name] ?? $default;
+    return is_string($environmentValue) ? trim($environmentValue) : $environmentValue;
 }
 
 function password_reset_password_is_valid(string $password): bool {
@@ -18,22 +24,32 @@ function password_reset_generic_message(): string {
 }
 
 function password_reset_email_is_configured(): bool {
-    return (bool) (password_reset_env('BREVO_API_KEY') && password_reset_env('EMAIL_FROM'));
+    return (bool) (
+        password_reset_env('GMAIL_SMTP_USER')
+        && password_reset_env('GMAIL_SMTP_APP_PASSWORD')
+        && password_reset_env('EMAIL_FROM')
+    );
 }
 
 function password_reset_send_email(string $recipient, string $token): bool {
-    $apiKey = password_reset_env('BREVO_API_KEY');
+    $smtpUser = password_reset_env('GMAIL_SMTP_USER');
+    $smtpPassword = password_reset_env('GMAIL_SMTP_APP_PASSWORD');
     $from = password_reset_env('EMAIL_FROM');
     $fromName = password_reset_env('EMAIL_FROM_NAME', 'SmartHOA');
     $appBaseUrl = rtrim(password_reset_env('APP_BASE_URL', 'https://smart-hoa-sigma.vercel.app'), '/');
 
     if (!password_reset_email_is_configured()) {
-        error_log('SmartHOA password reset email is not configured: BREVO_API_KEY or EMAIL_FROM is missing.');
+        error_log('SmartHOA password reset email is not configured: Gmail SMTP settings or EMAIL_FROM is missing.');
         return false;
     }
 
-    if (!function_exists('curl_init')) {
-        error_log('SmartHOA password reset email could not be sent: PHP cURL is unavailable.');
+    if (!filter_var($smtpUser, FILTER_VALIDATE_EMAIL) || !filter_var($from, FILTER_VALIDATE_EMAIL)) {
+        error_log('SmartHOA password reset email is not configured with valid Gmail sender addresses.');
+        return false;
+    }
+
+    if (strcasecmp($smtpUser, $from) !== 0) {
+        error_log('SmartHOA password reset email sender must match the Gmail SMTP account.');
         return false;
     }
 
@@ -44,54 +60,26 @@ function password_reset_send_email(string $recipient, string $token): bool {
         . '<p><a href="' . $safeResetUrl . '">Reset my password</a></p>'
         . '<p>This secure link can be used once and expires in 30 minutes. If you did not request it, you can safely ignore this email.</p>';
 
-    $payload = json_encode([
-        'sender' => [
-            'name' => $fromName,
-            'email' => $from,
-        ],
-        'to' => [[
-            'email' => $recipient,
-        ]],
-        'subject' => 'Reset your SmartHOA password',
-        // Brevo's transactional-email API expects htmlContent, rather than
-        // the html field used by several other email providers.
-        'htmlContent' => $html,
-    ]);
-
-    $curl = curl_init('https://api.brevo.com/v3/smtp/email');
-    curl_setopt_array($curl, [
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => $payload,
-        CURLOPT_HTTPHEADER => [
-            'api-key: ' . $apiKey,
-            'Content-Type: application/json',
-            'Accept: application/json',
-        ],
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 15,
-    ]);
-
-    $response = curl_exec($curl);
-    $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
-    $error = curl_error($curl);
-    curl_close($curl);
-
-    if ($response === false || $status < 200 || $status >= 300) {
-        $providerMessage = '';
-        if (is_string($response) && $response !== '') {
-            $decodedResponse = json_decode($response, true);
-            if (is_array($decodedResponse)) {
-                $providerMessage = trim((string) ($decodedResponse['message'] ?? $decodedResponse['code'] ?? ''));
-            }
-        }
-
-        error_log(
-            'SmartHOA password reset email failed with HTTP ' . $status
-            . ($error ? ': ' . $error : '')
-            . ($providerMessage ? ' Brevo: ' . substr($providerMessage, 0, 300) : '.')
-        );
+    try {
+        $mail = new PHPMailer(true);
+        $mail->isSMTP();
+        $mail->Host = 'smtp.gmail.com';
+        $mail->SMTPAuth = true;
+        $mail->Username = $smtpUser;
+        $mail->Password = $smtpPassword;
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->Port = 587;
+        $mail->CharSet = 'UTF-8';
+        $mail->setFrom($from, $fromName);
+        $mail->addAddress($recipient);
+        $mail->isHTML(true);
+        $mail->Subject = 'Reset your SmartHOA password';
+        $mail->Body = $html;
+        $mail->AltBody = "We received a request to reset your SmartHOA password. Open this link within 30 minutes: {$resetUrl}";
+        $mail->send();
+        return true;
+    } catch (Exception $exception) {
+        error_log('SmartHOA password reset email failed through Gmail SMTP: ' . substr($exception->getMessage(), 0, 300));
         return false;
     }
-
-    return true;
 }
