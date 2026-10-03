@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
-import { Search, MapPin, Mail, Phone, X, CheckCircle2 } from 'lucide-react';
+import { Search, MapPin, Mail, Phone, X, CheckCircle2, AlertTriangle } from 'lucide-react';
 import axios from 'axios';
 import { API_BASE_URL } from '../../config/api';
 
@@ -32,6 +32,7 @@ const ResidentList = () => {
   const [isAssigning, setIsAssigning] = useState(false);
   const [emailInput, setEmailInput] = useState('');
   const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
+  const [isEmailConfirmationOpen, setIsEmailConfirmationOpen] = useState(false);
   const [emailMessage, setEmailMessage] = useState('');
   const [emailError, setEmailError] = useState('');
 
@@ -56,6 +57,7 @@ const ResidentList = () => {
     setLotInput(resident.lot || '');
     setPropertyUse(resident.property_use || (resident.resident_type === 'Renter' ? 'Renter' : 'Homeowner'));
     setEmailInput(resident.email);
+    setIsEmailConfirmationOpen(false);
     setEmailMessage('');
     setEmailError('');
     setIsModalOpen(true);
@@ -82,7 +84,7 @@ const ResidentList = () => {
     }
   };
 
-  const handleUpdateEmail = async () => {
+  const requestEmailUpdate = () => {
     if (!selectedResident) return;
 
     const nextEmail = emailInput.trim().toLowerCase();
@@ -98,10 +100,13 @@ const ResidentList = () => {
       return;
     }
 
-    const isConfirmed = window.confirm(
-      `Confirm that you verified ${selectedResident.first_name} ${selectedResident.last_name}'s identity. Update their SmartHOA email to ${nextEmail}? Any existing password-reset links will stop working.`
-    );
-    if (!isConfirmed) return;
+    setIsEmailConfirmationOpen(true);
+  };
+
+  const handleUpdateEmail = async () => {
+    if (!selectedResident) return;
+
+    const nextEmail = emailInput.trim().toLowerCase();
 
     setIsUpdatingEmail(true);
     setEmailMessage('');
@@ -121,9 +126,11 @@ const ResidentList = () => {
           : resident
       ));
       setEmailMessage(response.data?.message || 'Resident email updated.');
+      setIsEmailConfirmationOpen(false);
     } catch (error) {
       const message = axios.isAxiosError(error) ? error.response?.data?.message : null;
       setEmailError(message || 'Unable to update the resident email. Please try again.');
+      setIsEmailConfirmationOpen(false);
     } finally {
       setIsUpdatingEmail(false);
     }
@@ -299,7 +306,7 @@ const ResidentList = () => {
           <div className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-xl animate-in zoom-in-95 duration-200 sm:max-h-[90vh]">
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
               <h3 className="font-bold text-gray-800">Manage Resident</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+              <button onClick={() => { setIsModalOpen(false); setIsEmailConfirmationOpen(false); }} className="text-gray-400 hover:text-gray-600 transition-colors">
                 <X size={20} />
               </button>
             </div>
@@ -376,7 +383,7 @@ const ResidentList = () => {
 
             <div className="flex flex-col gap-2 border-t border-gray-100 bg-gray-50 px-5 py-4 sm:flex-row sm:justify-between sm:gap-3 sm:px-6">
               <button 
-                onClick={() => setIsModalOpen(false)}
+                onClick={() => { setIsModalOpen(false); setIsEmailConfirmationOpen(false); }}
                 className="min-h-11 rounded-xl px-5 py-2.5 font-semibold text-gray-600 transition-colors hover:bg-gray-200"
               >
                 Cancel
@@ -384,9 +391,9 @@ const ResidentList = () => {
               <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                 <button
                   type="button"
-                  onClick={handleUpdateEmail}
+                  onClick={requestEmailUpdate}
                   disabled={isUpdatingEmail}
-                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-brown bg-white px-5 py-2.5 font-semibold text-brown transition-colors hover:bg-brown/10 disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400"
+                  className="flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-brown bg-white px-5 py-2.5 font-semibold text-brown transition-colors hover:bg-brown/10 disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400"
                 >
                   <Mail size={18} />
                   {isUpdatingEmail ? 'Updating...' : 'Update email'}
@@ -402,6 +409,52 @@ const ResidentList = () => {
                 </button>
               </div>
             </div>
+
+            {isEmailConfirmationOpen && (
+              <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+                <div role="dialog" aria-modal="true" aria-labelledby="email-change-title" className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+                  <div className="border-b border-gray-100 bg-amber-50 px-6 py-5">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                        <AlertTriangle size={21} />
+                      </div>
+                      <div>
+                        <h3 id="email-change-title" className="font-heading text-lg font-bold text-gray-800">Confirm email change</h3>
+                        <p className="mt-1 text-sm text-gray-600">Make sure you have verified this resident’s identity.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 px-6 py-5">
+                    <p className="text-sm leading-6 text-gray-700">
+                      You are changing <span className="font-semibold">{selectedResident.first_name} {selectedResident.last_name}</span>’s SmartHOA sign-in and password-reset email.
+                    </p>
+                    <div className="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Current email</p>
+                        <p className="mt-1 break-all font-medium text-gray-700">{selectedResident.email}</p>
+                      </div>
+                      <div className="border-t border-gray-200 pt-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">New email</p>
+                        <p className="mt-1 break-all font-semibold text-brown">{emailInput.trim().toLowerCase()}</p>
+                      </div>
+                    </div>
+                    <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900">
+                      Any password-reset links sent to the old email will stop working immediately.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col-reverse gap-2 border-t border-gray-100 bg-gray-50 px-5 py-4 sm:flex-row sm:justify-end">
+                    <button type="button" onClick={() => setIsEmailConfirmationOpen(false)} disabled={isUpdatingEmail} className="min-h-11 rounded-xl px-5 py-2.5 font-semibold text-gray-600 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed">
+                      Go back
+                    </button>
+                    <button type="button" onClick={handleUpdateEmail} disabled={isUpdatingEmail} className="min-h-11 rounded-xl bg-brown px-5 py-2.5 font-semibold text-white transition-colors hover:bg-brown-dark disabled:cursor-not-allowed disabled:bg-brown/50">
+                      {isUpdatingEmail ? 'Updating email...' : 'Confirm update'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
