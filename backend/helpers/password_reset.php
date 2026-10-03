@@ -53,7 +53,9 @@ function password_reset_send_email(string $recipient, string $token): bool {
             'email' => $recipient,
         ]],
         'subject' => 'Reset your SmartHOA password',
-        'html' => $html,
+        // Brevo's transactional-email API expects htmlContent, rather than
+        // the html field used by several other email providers.
+        'htmlContent' => $html,
     ]);
 
     $curl = curl_init('https://api.brevo.com/v3/smtp/email');
