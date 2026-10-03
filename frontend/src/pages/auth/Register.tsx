@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User, Mail, Lock, Phone, Eye, EyeOff } from 'lucide-react';
+import { User, Mail, Lock, Phone, Eye, EyeOff, Home } from 'lucide-react';
 import axios from 'axios';
 import { API_BASE_URL } from '../../config/api';
 import swrLogo from '../../assets/brand/swr-logo.png';
@@ -90,9 +90,18 @@ const Register = () => {
             <img src={swrLogo} alt="Southwynd San Pablo Homeowners Association" className="w-full h-auto" />
           </Link>
 
-          <div className="mb-8">
-            <h3 className="text-2xl font-heading font-bold text-gray-800 sm:text-3xl">Create Account</h3>
-            <p className="text-gray-500 mt-2">Please fill in your details to register.</p>
+          <div className="mb-8 flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-2xl font-heading font-bold text-gray-800 sm:text-3xl">Create Account</h3>
+              <p className="text-gray-500 mt-2">Please fill in your details to register.</p>
+            </div>
+            <Link
+              to="/"
+              className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-brown/20 bg-cream px-4 py-2.5 text-sm font-semibold text-brown transition-colors hover:bg-brown/10"
+            >
+              <Home size={18} />
+              Home
+            </Link>
           </div>
 
           {error && (
