@@ -245,7 +245,7 @@ function run_dues_collection_policy(PDO $db, $runDate = null) {
                 $stage = dues_policy_stage($calculation['months_overdue']);
                 $requiresHearing = $stage === 'third_notice_hearing';
 
-                $createAssessment->execute([
+                $assessmentValues = [
                     $resident['resident_id'],
                     $policyDate->format('Y-m-d'),
                     $calculation['base_balance'],
@@ -254,9 +254,15 @@ function run_dues_collection_policy(PDO $db, $runDate = null) {
                     $interestThisCycle,
                     $calculation['total_balance'],
                     $calculation['months_overdue'],
-                    $stage,
-                    $requiresHearing
-                ]);
+                    $stage
+                ];
+                foreach ($assessmentValues as $index => $value) {
+                    $createAssessment->bindValue($index + 1, $value);
+                }
+                // execute([...]) binds false as an empty string, which PostgreSQL
+                // rejects for BOOLEAN. Keep the hearing flag explicitly typed.
+                $createAssessment->bindValue(10, $requiresHearing, PDO::PARAM_BOOL);
+                $createAssessment->execute();
                 if ($createAssessment->fetchColumn()) {
                     $summary['assessments_created']++;
                     if ($requiresHearing) {

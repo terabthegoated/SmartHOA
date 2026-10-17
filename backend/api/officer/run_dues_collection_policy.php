@@ -76,7 +76,7 @@ try {
     error_log('SmartHOA collection policy failed: ' . $exception->getMessage());
     http_response_code(500);
     echo json_encode([
-        'message' => 'Unable to run the collection policy. Make sure the latest database migration has been applied.'
+        'message' => 'Unable to complete the collection policy. Please try again or contact the system administrator.'
     ]);
 }
 ?>
