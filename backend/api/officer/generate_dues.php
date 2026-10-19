@@ -61,7 +61,6 @@ if ($authHeader) {
             $paymentTypeId = trim((string) ($data['payment_type_id'] ?? ''));
             $amountInput = $data['amount_due'] ?? null;
             $dueDate = trim((string) ($data['due_date'] ?? ''));
-            $billingMonthInput = trim((string) ($data['billing_month'] ?? ''));
 
             if ($residentId === '' || $paymentTypeId === '' || $dueDate === '' || $amountInput === null) {
                 http_response_code(400);
@@ -75,18 +74,11 @@ if ($authHeader) {
                 exit();
             }
 
-            $dueDateObject = DateTimeImmutable::createFromFormat('!Y-m-d', $dueDate);
-            $dueDateErrors = DateTimeImmutable::getLastErrors();
-            if ($dueDateObject === false || ($dueDateErrors !== false && ($dueDateErrors['warning_count'] > 0 || $dueDateErrors['error_count'] > 0))) {
-                http_response_code(400);
-                echo json_encode(array("message" => "Due date must use the YYYY-MM-DD format."));
-                exit();
-            }
-
             try {
-                // Respect an explicitly selected period. For older clients,
-                // infer the period from the due date, never the creation month.
-                $billingMonth = bill_billing_month($billingMonthInput, $dueDateObject);
+                $dueDateObject = bill_due_date($dueDate);
+                // The server derives the period from the deadline. Ignore any
+                // stale billing_month field sent by an older cached client.
+                $billingMonth = bill_billing_month($dueDateObject);
             } catch (InvalidArgumentException $error) {
                 http_response_code(400);
                 echo json_encode(['message' => $error->getMessage()]);

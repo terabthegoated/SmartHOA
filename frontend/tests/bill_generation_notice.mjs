@@ -41,9 +41,10 @@ try {
   assert.match(handler, /finally\s*\{\s*setIsGenerating\(false\)/);
   assert.match(source, /aria-labelledby="generate-bill-title"/);
   assert.match(source, /<fieldset disabled=\{isGenerating\}/);
-  assert.match(handler, /billing_month: billPeriodPayload\(billingPeriod.month\)/);
-  assert.match(source, /id="bill-billing-month" type="month" required/);
-  assert.match(source, /setBillingPeriod\(current => billPeriodForDueDate\(current, e.target.value\)\)/);
+  assert.match(handler, /due_date: dueDate/);
+  assert.match(handler, /billingLabel: billPeriodLabel\(billPeriodForDueDate\(dueDate\)\)/);
+  assert.doesNotMatch(handler, /billing_month\s*:/);
+  assert.doesNotMatch(source, /bill-billing-month|type="month"|setBillingPeriod|BillPeriodSelection/);
   console.log('PASS: generate-bill handling has no native alert and always resets its loading state.');
   console.log('5/5 bill-notice rendering / wiring checks passed; no bills generated.');
 } finally { await server.close(); }

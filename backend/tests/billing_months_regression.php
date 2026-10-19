@@ -18,30 +18,30 @@ function period_fixture($status = 'Pending', $type = 'dues', $month = '2026-10-0
     $db->prepare("INSERT INTO payments VALUES ('old', ?, ?, ?, '2026-10-16', 325, ?)")->execute([$resident, $type, $month, $status]);
     return $db;
 }
-function period_due($date) { return new DateTimeImmutable($date, new DateTimeZone('Asia/Manila')); }
+function period_due($date) { return bill_due_date($date); }
 
 $tests = [
-    'older clients infer November from November 16, not the creation month' => function () {
-        period_assert(bill_billing_month('', period_due('2026-11-16')), '2026-11-01');
-        period_assert(bill_billing_month(null, period_due('2026-11-16')), '2026-11-01');
+    'November 16 always identifies November, not the creation month' => function () {
+        period_assert(bill_billing_month(period_due('2026-11-16')), '2026-11-01');
     },
     'year transition infers January of the following year' => function () {
-        period_assert(bill_billing_month('', period_due('2027-01-16')), '2027-01-01');
+        period_assert(bill_billing_month(period_due('2027-01-16')), '2027-01-01');
     },
-    'explicit October period is preserved with a November deadline' => function () {
-        period_assert(bill_billing_month('2026-10', period_due('2026-11-16')), '2026-10-01');
+    'changing the deadline changes the period without separate input' => function () {
+        period_assert(bill_billing_month(period_due('2026-10-16')), '2026-10-01');
+        period_assert(bill_billing_month(period_due('2026-11-16')), '2026-11-01');
     },
-    'valid full dates and month-only inputs normalize to first day' => function () {
-        foreach (['2026-11', '2026-11-01', '2026-11-30', ' 2026-11 '] as $input) {
-            period_assert(bill_billing_month($input, period_due('2026-10-16')), '2026-11-01');
+    'dates in the same month normalize to first day including leap dates' => function () {
+        foreach (['2026-11-01', '2026-11-16', '2026-11-30'] as $input) {
+            period_assert(bill_billing_month(period_due($input)), '2026-11-01');
         }
-        period_assert(bill_billing_month('2028-02-29', period_due('2028-03-16')), '2028-02-01');
+        period_assert(bill_billing_month(period_due('2028-02-29')), '2028-02-01');
     },
-    'malformed months and invalid calendar dates are rejected' => function () {
-        foreach (['2026-13', '2026-00', '2026-1', '0000-01', '2026-02-29', '2026-11-31', '2026-11-00', '2026-11-01extra'] as $input) {
-            try { bill_billing_month($input, period_due('2026-11-16')); }
+    'invalid and incomplete deadlines are rejected before month detection' => function () {
+        foreach (['', '2026-11', '2026-13-16', '2026-00-16', '2026-1-16', '0000-01-16', '2026-02-29', '2026-11-31', '2026-11-00', '2026-11-16extra'] as $input) {
+            try { bill_due_date($input); }
             catch (InvalidArgumentException $error) { continue; }
-            throw new RuntimeException('Invalid period was accepted: ' . $input);
+            throw new RuntimeException('Invalid deadline was accepted: ' . $input);
         }
     },
     'October unpaid, overdue and paid bills do not block November' => function () {
@@ -60,10 +60,12 @@ $tests = [
     },
     'different due dates do not bypass the same-period duplicate guard' => function () {
         $db = period_fixture('Pending', 'dues', '2026-11-01');
-        foreach (['2026-11-16', '2026-11-20', '2026-12-16'] as $deadline) {
-            $month = bill_billing_month('2026-11', period_due($deadline));
+        foreach (['2026-11-01', '2026-11-16', '2026-11-20', '2026-11-30'] as $deadline) {
+            $month = bill_billing_month(period_due($deadline));
             period_assert(dues_balance_monthly_bill_exists($db, 'resident', $month), true);
         }
+        period_assert(dues_balance_monthly_bill_exists($db, 'resident', bill_billing_month(period_due('2026-12-16'))), false);
+        period_assert(dues_balance_monthly_bill_exists($db, 'resident', bill_billing_month(period_due('2027-11-16'))), false);
     },
     'cancelled bills and unrelated fees do not block a monthly bill' => function () {
         period_assert(dues_balance_monthly_bill_exists(period_fixture('Cancelled', 'dues', '2026-11-01'), 'resident', '2026-11-01'), false);
@@ -75,7 +77,7 @@ $tests = [
     'synthetic next-month creation preserves history and blocks a repeat' => function () {
         $db = period_fixture('Paid');
         $old = $db->query('SELECT * FROM payments')->fetchAll(PDO::FETCH_ASSOC);
-        $month = bill_billing_month('', period_due('2026-11-16'));
+        $month = bill_billing_month(period_due('2026-11-16'));
         $db->beginTransaction();
         dues_balance_lock_resident($db, 'resident');
         period_assert(dues_balance_monthly_bill_exists($db, 'resident', $month), false);
@@ -85,6 +87,15 @@ $tests = [
         period_assert($db->query("SELECT billing_month FROM payments WHERE payment_id = 'new'")->fetchColumn(), '2026-11-01');
         period_assert(dues_balance_monthly_bill_exists($db, 'resident', $month), true);
         period_assert((int) $db->query('SELECT COUNT(*) FROM payments')->fetchColumn(), 2);
+    },
+    'manual creation endpoint cannot override the due-date period from client input' => function () {
+        $source = file_get_contents(__DIR__ . '/../api/officer/generate_dues.php');
+        if (str_contains($source, '$billingMonthInput') || str_contains($source, '$data[\'billing_month\']')) {
+            throw new RuntimeException('Separate client billing month is still used.');
+        }
+        if (!str_contains($source, '$dueDateObject = bill_due_date($dueDate);') || !str_contains($source, '$billingMonth = bill_billing_month($dueDateObject);')) {
+            throw new RuntimeException('Manual creation does not derive its period from the validated deadline.');
+        }
     },
 ];
 

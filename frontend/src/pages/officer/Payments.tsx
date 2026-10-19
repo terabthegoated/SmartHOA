@@ -6,7 +6,7 @@ import { API_BASE_URL } from '../../config/api';
 import DuesImportPreviewModal from '../../components/payments/DuesImportPreviewModal';
 import PaymentAmount, { paymentTotal, formatPesos, type PaymentBalance } from '../../components/payments/PaymentAmount';
 import BillGenerationNotice, { type BillGenerationIssue } from '../../components/payments/BillGenerationNotice';
-import { billPeriodForDueDate, billPeriodLabel, billPeriodPayload, isValidBillMonth, type BillPeriodSelection } from '../../services/billGenerationPeriod';
+import { billPeriodForDueDate, billPeriodLabel } from '../../services/billGenerationPeriod';
 
 interface Payment extends PaymentBalance {
   payment_id: string;
@@ -90,7 +90,6 @@ const Payments = () => {
   const [selectedTypeId, setSelectedTypeId] = useState('');
   const [amount, setAmount] = useState('');
   const [dueDate, setDueDate] = useState('');
-  const [billingPeriod, setBillingPeriod] = useState<BillPeriodSelection>({ month: '', explicit: false });
 
   // Verify modal state
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
@@ -176,7 +175,7 @@ const Payments = () => {
   };
 
   const handleGenerateBill = async () => {
-    if (!selectedResidentId || !selectedTypeId || !amount || !dueDate || !isValidBillMonth(billingPeriod.month) || isGenerating) return;
+    if (!selectedResidentId || !selectedTypeId || !amount || !billPeriodForDueDate(dueDate) || isGenerating) return;
     setBillGenerationIssue(null);
     setIsGenerating(true);
 
@@ -186,7 +185,6 @@ const Payments = () => {
         payment_type_id: selectedTypeId,
         amount_due: amount,
         due_date: dueDate,
-        billing_month: billPeriodPayload(billingPeriod.month),
       }, { headers: { Authorization: `Bearer ${token}` } });
       
       await fetchData();
@@ -197,13 +195,12 @@ const Payments = () => {
       setSelectedTypeId('');
       setAmount('');
       setDueDate('');
-      setBillingPeriod({ month: '', explicit: false });
     } catch (error) {
       console.error("Failed to generate bill", error);
       const message = axios.isAxiosError(error) ? error.response?.data?.message : undefined;
       setBillGenerationIssue({
         kind: axios.isAxiosError(error) && error.response?.status === 409 ? 'duplicate' : 'error',
-        billingLabel: billPeriodLabel(billingPeriod.month),
+        billingLabel: billPeriodLabel(billPeriodForDueDate(dueDate)),
         message: typeof message === 'string' && message.trim() ? message : 'Please check the bill details and try again. Your form details have been kept.',
       });
     } finally {
@@ -912,18 +909,6 @@ const Payments = () => {
                 )}
               </div>
 
-              <div>
-                <label htmlFor="bill-billing-month" className="mb-2 block text-sm font-semibold text-gray-700">Billing Month</label>
-                <input id="bill-billing-month" type="month" required
-                  value={billingPeriod.month}
-                  onChange={event => {
-                    setBillGenerationIssue(null);
-                    setBillingPeriod({ month: event.target.value, explicit: Boolean(event.target.value) });
-                  }}
-                  className="min-h-12 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 focus:border-brown focus:outline-none focus:ring-1 focus:ring-brown" />
-                <p className="mt-2 text-xs leading-5 text-gray-500">The month this bill covers. Defaults to the due-date month unless you choose a different billing month.</p>
-              </div>
-
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Amount (₱)</label>
@@ -945,7 +930,6 @@ const Payments = () => {
                     onChange={(e) => {
                       setBillGenerationIssue(null);
                       setDueDate(e.target.value);
-                      setBillingPeriod(current => billPeriodForDueDate(current, e.target.value));
                     }}
                   />
                 </div>
@@ -964,9 +948,9 @@ const Payments = () => {
               <button 
                 type="button"
                 onClick={handleGenerateBill}
-                disabled={!selectedResidentId || !selectedTypeId || !amount || !dueDate || !isValidBillMonth(billingPeriod.month) || isGenerating}
+                disabled={!selectedResidentId || !selectedTypeId || !amount || !billPeriodForDueDate(dueDate) || isGenerating}
                 className={`min-h-11 px-5 py-2.5 rounded-xl font-semibold text-white flex items-center justify-center gap-2 transition-colors ${
-                  !selectedResidentId || !selectedTypeId || !amount || !dueDate || !isValidBillMonth(billingPeriod.month) || isGenerating ? 'bg-brown/50 cursor-not-allowed' : 'bg-brown hover:bg-brown-dark'
+                  !selectedResidentId || !selectedTypeId || !amount || !billPeriodForDueDate(dueDate) || isGenerating ? 'bg-brown/50 cursor-not-allowed' : 'bg-brown hover:bg-brown-dark'
                 }`}
               >
                 {isGenerating && <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />}
