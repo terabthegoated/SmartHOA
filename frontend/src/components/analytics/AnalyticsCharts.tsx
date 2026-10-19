@@ -42,7 +42,7 @@ const AnalyticsCharts = ({
           <div className="p-2 bg-green-50 text-green-600 rounded-lg"><BarChart3 size={20} /></div>
           <div>
             <h2 className="text-lg font-bold text-gray-800">Payment Status Trend</h2>
-            <p className="text-sm text-gray-500">Paid and unpaid billed amounts by billing month.</p>
+            <p className="text-sm text-gray-500">Verified payments and outstanding balances including interest, by billing month. Receipts under verification are excluded from outstanding balances.</p>
           </div>
         </div>
         <div className="h-80 w-full">
@@ -58,8 +58,8 @@ const AnalyticsCharts = ({
                   formatter={(value) => [`₱${Number(value).toLocaleString()}`, '']}
                 />
                 <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
-                <Bar dataKey="collected" name="Paid bills" fill="#D4AF37" radius={[4, 4, 0, 0]} barSize={30} />
-                <Bar dataKey="pending" name="Unpaid bills" fill="#E5E7EB" radius={[4, 4, 0, 0]} barSize={30} />
+                <Bar dataKey="collected" name="Verified payments" fill="#D4AF37" radius={[4, 4, 0, 0]} barSize={30} />
+                <Bar dataKey="pending" name="Outstanding incl. interest" fill="#E5E7EB" radius={[4, 4, 0, 0]} barSize={30} />
               </BarChart>
             </ResponsiveContainer>
           ) : (

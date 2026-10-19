@@ -18,6 +18,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   const login = useAuthStore((state: any) => state.login);
+  const sessionExpired = useAuthStore(state => state.sessionExpired);
   const navigate = useNavigate();
 
   const handleGoogleLogin = useGoogleLogin({
@@ -127,6 +128,7 @@ const Login = () => {
           </div>
 
           <form onSubmit={handleLogin} className="space-y-6">
+            {sessionExpired && !error && <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Your session has expired. Please sign in again to continue.</p>}
             {error && (
               <div className="p-3 bg-red-50 text-red-600 text-sm font-semibold rounded-lg border border-red-100">
                 {error}

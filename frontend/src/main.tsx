@@ -3,6 +3,10 @@ import { createRoot } from 'react-dom/client'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import './index.css'
 import App from './App.tsx'
+import { initializeSessionHandling } from './services/sessionHandling'
+
+const disposeSessionHandling = initializeSessionHandling();
+if (import.meta.hot) import.meta.hot.dispose(disposeSessionHandling);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

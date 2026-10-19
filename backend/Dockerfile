@@ -15,6 +15,7 @@ RUN apt-get update \
 WORKDIR /var/www/html
 COPY --from=dependencies /app/vendor ./vendor
 COPY . ./
+COPY docker/uploads.ini /usr/local/etc/php/conf.d/smarthoa-uploads.ini
 
 RUN mkdir -p uploads/complaints uploads/receipts \
     && chown -R www-data:www-data uploads \

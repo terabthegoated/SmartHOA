@@ -122,7 +122,7 @@ const MyComplaints = () => {
       setAttachment(null);
     } catch (error) {
       console.error("Failed to submit complaint", error);
-      alert("Failed to submit complaint. Please try again.");
+      alert(axios.isAxiosError(error) ? error.response?.data?.message || 'Unable to submit complaint.' : 'Unable to submit complaint.');
     } finally {
       setIsSubmitting(false);
     }
@@ -293,12 +293,12 @@ const MyComplaints = () => {
                 <label className="group flex h-28 w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-white transition-colors hover:bg-gray-50">
                   <div className="flex flex-col items-center justify-center">
                     <FileImage className="w-6 h-6 text-gray-400 group-hover:text-brown mb-1 transition-colors" />
-                    <p className="text-xs text-gray-500 font-semibold">{attachment ? attachment.name : 'Upload an image'}</p>
+                    <p className="text-xs text-gray-500 font-semibold">{attachment ? attachment.name : 'JPEG, PNG or WebP image (max 5 MB)'}</p>
                   </div>
                   <input 
                     type="file" 
                     className="hidden" 
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp"
                     onChange={(e) => setAttachment(e.target.files ? e.target.files[0] : null)}
                   />
                 </label>

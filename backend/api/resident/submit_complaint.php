@@ -12,6 +12,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../../helpers/complaint_priority_rules.php';
+require_once __DIR__ . '/../../helpers/complaint_upload.php';
+Dotenv\Dotenv::createImmutable(__DIR__ . '/../../')->safeLoad();
 use \Firebase\JWT\JWT;
 use \Firebase\JWT\Key;
 
@@ -66,6 +68,14 @@ if ($authHeader) {
                 exit();
             }
 
+            try {
+                $validatedImage = validate_complaint_image($_FILES['attachment'] ?? null);
+            } catch (InvalidArgumentException $error) {
+                http_response_code(400);
+                echo json_encode(['message' => $error->getMessage()]);
+                exit();
+            }
+            $savedAttachment = null;
             $database = new Database();
             $db = $database->getConnection();
             $db->beginTransaction();
@@ -121,24 +131,19 @@ if ($authHeader) {
                 ]);
                 $complaint_id = $stmt->fetchColumn();
 
-                // Handle file attachment if present
-                if (isset($_FILES['attachment']) && $_FILES['attachment']['error'] === UPLOAD_ERR_OK) {
-                    $upload_dir = '../../uploads/complaints/';
-                    if (!file_exists($upload_dir)) {
-                        mkdir($upload_dir, 0777, true);
+                if ($validatedImage !== null) {
+                    $directory = __DIR__ . '/../../uploads/complaints/';
+                    if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
+                        throw new RuntimeException('Attachment storage is unavailable.');
                     }
-
-                    $file = $_FILES['attachment'];
-                    $file_extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-                    $new_filename = uniqid('complaint_', true) . '.' . $file_extension;
-                    $target_file = $upload_dir . $new_filename;
-
-                    if (move_uploaded_file($file['tmp_name'], $target_file)) {
-                        $file_url = '/uploads/complaints/' . $new_filename;
-                        $attach_query = "INSERT INTO complaint_attachments (complaint_id, file_url) VALUES (?, ?)";
-                        $attach_stmt = $db->prepare($attach_query);
-                        $attach_stmt->execute([$complaint_id, $file_url]);
+                    $filename = 'complaint_' . bin2hex(random_bytes(16)) . '.' . $validatedImage['extension'];
+                    $target = $directory . $filename;
+                    if (!move_uploaded_file($validatedImage['tmp_name'], $target)) {
+                        throw new RuntimeException('The complaint image could not be saved. Please retry.');
                     }
+                    $savedAttachment = $target;
+                    $db->prepare('INSERT INTO complaint_attachments (complaint_id, file_url) VALUES (?, ?)')
+                        ->execute([$complaint_id, '/uploads/complaints/' . $filename]);
                 }
 
                 $db->commit();
@@ -154,10 +159,12 @@ if ($authHeader) {
 
             } catch (InvalidArgumentException $e) {
                 $db->rollBack();
+                if ($savedAttachment !== null && is_file($savedAttachment)) unlink($savedAttachment);
                 http_response_code(400);
                 echo json_encode(array("message" => $e->getMessage()));
             } catch (Exception $e) {
                 $db->rollBack();
+                if ($savedAttachment !== null && is_file($savedAttachment)) unlink($savedAttachment);
                 throw $e;
             }
 

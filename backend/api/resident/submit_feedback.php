@@ -11,6 +11,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/../../helpers/complaint_feedback.php';
+Dotenv\Dotenv::createImmutable(__DIR__ . '/../../')->safeLoad();
 
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
@@ -28,6 +30,7 @@ if (!function_exists('apache_request_headers')) {
     }
 }
 
+$authenticated = false;
 try {
     $headers = apache_request_headers();
     list($jwt) = sscanf($headers['Authorization'] ?? '', 'Bearer %s');
@@ -37,6 +40,7 @@ try {
 
     $jwt_secret = $_ENV['JWT_SECRET'] ?? 'super_secret_smarthoa_key_2026_change_me';
     $decoded = JWT::decode($jwt, new Key($jwt_secret, 'HS256'));
+    $authenticated = true;
     if (!in_array($decoded->data->role, ['Homeowner', 'Renter'], true)) {
         http_response_code(403);
         echo json_encode(array('message' => 'Unauthorized access.'));
@@ -55,29 +59,12 @@ try {
 
     $database = new Database();
     $db = $database->getConnection();
-    $stmt = $db->prepare("\n+        SELECT c.complaint_id, c.resident_id\n+        FROM complaints c\n+        JOIN resident_profiles rp ON c.resident_id = rp.resident_id\n+        WHERE c.complaint_id = ?\n+          AND rp.user_id = ?\n+          AND c.complaint_status IN ('Resolved', 'Closed')\n+    ");
-    $stmt->execute([$complaintId, $decoded->data->user_id]);
-    $complaint = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$complaint) {
-        http_response_code(404);
-        echo json_encode(array('message' => 'This complaint cannot be rated.'));
-        exit();
-    }
-
-    $stmt = $db->prepare("SELECT feedback_id FROM feedback WHERE complaint_id = ? AND resident_id = ? ORDER BY submitted_at DESC LIMIT 1");
-    $stmt->execute([$complaintId, $complaint['resident_id']]);
-    $feedbackId = $stmt->fetchColumn();
-    if ($feedbackId) {
-        $stmt = $db->prepare("UPDATE feedback SET rating = ?, comment = ?, submitted_at = CURRENT_TIMESTAMP WHERE feedback_id = ?");
-        $stmt->execute([$rating, $comment ?: null, $feedbackId]);
-    } else {
-        $stmt = $db->prepare("INSERT INTO feedback (complaint_id, resident_id, rating, comment) VALUES (?, ?, ?, ?)");
-        $stmt->execute([$complaintId, $complaint['resident_id'], $rating, $comment ?: null]);
-    }
-
+    save_complaint_feedback($db, $decoded->data->user_id, $complaintId, $data->rating ?? 0, $comment);
     echo json_encode(array('message' => 'Thank you for your feedback.'));
 } catch (Exception $e) {
-    http_response_code(401);
-    echo json_encode(array('message' => 'Unable to submit feedback.', 'error' => $e->getMessage()));
+    $code = !$authenticated ? 401 : (in_array($e->getCode(), [400, 404], true) ? $e->getCode() : 500);
+    http_response_code($code);
+    if ($code === 500) error_log('SmartHOA feedback save failed: ' . $e->getMessage());
+    echo json_encode(['message' => $code === 401 ? 'Access denied.' : ($code === 500 ? 'Unable to submit feedback. Please try again.' : $e->getMessage())]);
 }
 ?>

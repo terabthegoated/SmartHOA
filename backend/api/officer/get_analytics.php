@@ -11,6 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/../../helpers/payment_analytics.php';
 
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
@@ -56,11 +57,6 @@ try {
 
     $database = new Database();
     $db = $database->getConnection();
-    $scalar = function ($query, $params = array()) use ($db) {
-        $stmt = $db->prepare($query);
-        $stmt->execute($params);
-        return $stmt->fetchColumn();
-    };
     $response = array();
 
     // Community size and financial position. A resident profile is more
@@ -72,86 +68,14 @@ try {
             (SELECT COUNT(*) FROM resident_profiles WHERE resident_status = 'Active') AS total_residents,
             (SELECT COUNT(*) FROM properties) AS total_properties,
             (SELECT COUNT(*) FROM properties WHERE property_use = 'Airbnb') AS airbnb_properties,
-            (SELECT COUNT(*) FROM properties WHERE property_use = 'Renter') AS renter_properties,
-            (
-                SELECT COUNT(DISTINCT p.payment_id)
-                FROM payments p
-                INNER JOIN payment_receipts pr ON p.payment_id = pr.payment_id
-                WHERE p.payment_status = 'Pending'
-            ) AS pending_verifications
+            (SELECT COUNT(*) FROM properties WHERE property_use = 'Renter') AS renter_properties
     ")->fetch(PDO::FETCH_ASSOC) ?: array();
     $response['total_residents'] = (int) ($communityMetrics['total_residents'] ?? 0);
     $response['total_properties'] = (int) ($communityMetrics['total_properties'] ?? 0);
     $response['airbnb_properties'] = (int) ($communityMetrics['airbnb_properties'] ?? 0);
     $response['renter_properties'] = (int) ($communityMetrics['renter_properties'] ?? 0);
-    $response['pending_verifications'] = (int) ($communityMetrics['pending_verifications'] ?? 0);
 
-    // All-bill figures include one-time fees such as car stickers and
-    // construction fees. They are intentionally separate from the HOA-dues
-    // compliance figures below, so they do not distort collection performance.
-    // The same scan also calculates the dues-only KPIs and overdue counts
-    // which used to require three extra queries.
-    $financialMetrics = $db->query("
-        WITH payment_rows AS (
-            SELECT
-                p.amount_due,
-                p.payment_status,
-                p.billing_month,
-                p.due_date,
-                p.resident_id,
-                LOWER(pt.payment_name) IN ('monthly hoa dues', 'monthly hoa dues + penalty') AS is_hoa_dues
-            FROM payments p
-            LEFT JOIN payment_types pt ON pt.payment_type_id = p.payment_type_id
-        )
-        SELECT
-            COALESCE(SUM(amount_due) FILTER (WHERE payment_status <> 'Cancelled'), 0) AS total_billed,
-            COALESCE(SUM(amount_due) FILTER (WHERE payment_status = 'Paid'), 0) AS total_collected,
-            COALESCE(SUM(amount_due) FILTER (WHERE payment_status NOT IN ('Paid', 'Cancelled')), 0) AS total_outstanding,
-            COALESCE(SUM(amount_due) FILTER (
-                WHERE is_hoa_dues AND payment_status NOT IN ('Paid', 'Cancelled')
-            ), 0) AS outstanding_dues,
-            COALESCE(SUM(amount_due) FILTER (
-                WHERE is_hoa_dues
-                  AND billing_month >= DATE_TRUNC('month', CURRENT_DATE)::date
-                  AND billing_month < (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month')::date
-                  AND payment_status <> 'Cancelled'
-            ), 0) AS current_month_billed,
-            COALESCE(SUM(amount_due) FILTER (
-                WHERE is_hoa_dues
-                  AND billing_month >= DATE_TRUNC('month', CURRENT_DATE)::date
-                  AND billing_month < (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month')::date
-                  AND payment_status = 'Paid'
-            ), 0) AS current_month_collected,
-            COUNT(*) FILTER (
-                WHERE is_hoa_dues
-                  AND payment_status NOT IN ('Paid', 'Cancelled')
-                  AND due_date < CURRENT_DATE
-            ) AS overdue_bill_count,
-            COUNT(DISTINCT resident_id) FILTER (
-                WHERE is_hoa_dues
-                  AND payment_status NOT IN ('Paid', 'Cancelled')
-                  AND due_date < CURRENT_DATE
-            ) AS overdue_accounts,
-            COALESCE(SUM(amount_due) FILTER (
-                WHERE is_hoa_dues
-                  AND payment_status NOT IN ('Paid', 'Cancelled')
-                  AND due_date < CURRENT_DATE
-            ), 0) AS overdue_amount
-        FROM payment_rows
-    ")->fetch(PDO::FETCH_ASSOC) ?: array();
-    $response['total_billed'] = (float) ($financialMetrics['total_billed'] ?? 0);
-    $response['total_collected'] = (float) ($financialMetrics['total_collected'] ?? 0);
-    $response['total_outstanding'] = (float) ($financialMetrics['total_outstanding'] ?? 0);
-    $response['outstanding_dues'] = (float) ($financialMetrics['outstanding_dues'] ?? 0);
-    $billed = (float) ($financialMetrics['current_month_billed'] ?? 0);
-    $collected = (float) ($financialMetrics['current_month_collected'] ?? 0);
-    $response['current_month_billed'] = $billed;
-    $response['current_month_collected'] = $collected;
-    $response['collection_rate'] = $billed > 0 ? round(($collected / $billed) * 100, 1) : null;
-    $response['current_month_outstanding'] = (float) ($billed - $collected);
-    $response['overdue_accounts'] = (int) ($financialMetrics['overdue_accounts'] ?? 0);
-    $response['overdue_bill_count'] = (int) ($financialMetrics['overdue_bill_count'] ?? 0);
-    $response['overdue_amount'] = (float) ($financialMetrics['overdue_amount'] ?? 0);
+    $response = array_merge($response, analytics_payment_metrics(analytics_payment_rows($db)));
 
     // Complaint workload and service quality. The first Resolved/Closed update
     // is used when available, rather than a later edit to the complaint record.
@@ -257,105 +181,6 @@ try {
     $response['complaints_by_priority'] = $response['priority_distribution'];
     $response['complaint_priority_distribution'] = $response['priority_distribution'];
 
-    // Dues-only status distribution used alongside the collection-rate KPI.
-    $stmt = $db->prepare("
-        SELECT p.payment_status AS name, COUNT(p.payment_id) AS value
-        FROM payments p
-        INNER JOIN payment_types pt ON pt.payment_type_id = p.payment_type_id
-        WHERE LOWER(pt.payment_name) IN ('monthly hoa dues', 'monthly hoa dues + penalty')
-        GROUP BY p.payment_status
-        ORDER BY value DESC, name ASC
-    ");
-    $stmt->execute();
-    $response['payment_compliance'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    foreach ($response['payment_compliance'] as &$paymentStatus) {
-        $paymentStatus['value'] = (int) $paymentStatus['value'];
-    }
-    unset($paymentStatus);
-
-    // A separately named all-bill status distribution is useful for one-time
-    // fees without mixing them into dues-compliance figures.
-    $stmt = $db->prepare("SELECT payment_status AS name, COUNT(payment_id) AS value FROM payments GROUP BY payment_status ORDER BY value DESC, name ASC");
-    $stmt->execute();
-    $response['payment_status_distribution'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    foreach ($response['payment_status_distribution'] as &$paymentStatus) {
-        $paymentStatus['value'] = (int) $paymentStatus['value'];
-    }
-    unset($paymentStatus);
-
-    // This is a billing-month compliance trend (not a cash-flow report). All
-    // six months are present so a new or quiet month renders as zero instead
-    // of disappearing from the officer's chart.
-    $stmt = $db->prepare("
-        WITH months AS (
-            SELECT (DATE_TRUNC('month', CURRENT_DATE) - (offsets.months_ago * INTERVAL '1 month'))::date AS month_start
-            FROM generate_series(5, 0, -1) AS offsets(months_ago)
-        )
-        SELECT
-            TO_CHAR(months.month_start, 'Mon YYYY') AS name,
-            months.month_start::text AS month,
-            COALESCE(SUM(CASE WHEN p.payment_status <> 'Cancelled' THEN p.amount_due ELSE 0 END), 0) AS billed,
-            COALESCE(SUM(CASE WHEN p.payment_status = 'Paid' THEN p.amount_due ELSE 0 END), 0) AS collected,
-            COALESCE(SUM(CASE WHEN p.payment_status NOT IN ('Paid', 'Cancelled') THEN p.amount_due ELSE 0 END), 0) AS pending,
-            COALESCE(SUM(CASE WHEN p.payment_status NOT IN ('Paid', 'Cancelled') AND p.due_date < CURRENT_DATE THEN p.amount_due ELSE 0 END), 0) AS overdue_amount
-        FROM months
-        LEFT JOIN payments p
-          ON p.billing_month >= months.month_start
-         AND p.billing_month < (months.month_start + INTERVAL '1 month')::date
-        GROUP BY months.month_start
-        ORDER BY months.month_start
-    ");
-    $stmt->execute();
-    $response['monthly_revenue'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    foreach ($response['monthly_revenue'] as &$month) {
-        $month['billed'] = (float) $month['billed'];
-        $month['collected'] = (float) $month['collected'];
-        $month['pending'] = (float) $month['pending'];
-        $month['outstanding'] = $month['pending'];
-        $month['overdue_amount'] = (float) $month['overdue_amount'];
-        $month['collection_rate'] = $month['billed'] > 0
-            ? round(($month['collected'] / $month['billed']) * 100, 1)
-            : null;
-    }
-    unset($month);
-    $response['monthly_payment_trends'] = $response['monthly_revenue'];
-    $response['payment_trend_basis'] = 'Billing month. Collected is the amount of bills currently marked Paid, not cash received by transaction date.';
-
-    $stmt = $db->prepare("
-        WITH months AS (
-            SELECT (DATE_TRUNC('month', CURRENT_DATE) - (offsets.months_ago * INTERVAL '1 month'))::date AS month_start
-            FROM generate_series(5, 0, -1) AS offsets(months_ago)
-        )
-        SELECT
-            TO_CHAR(months.month_start, 'Mon YYYY') AS name,
-            months.month_start::text AS month,
-            COALESCE(SUM(CASE WHEN p.payment_status <> 'Cancelled' THEN p.amount_due ELSE 0 END), 0) AS billed,
-            COALESCE(SUM(CASE WHEN p.payment_status = 'Paid' THEN p.amount_due ELSE 0 END), 0) AS collected,
-            COALESCE(SUM(CASE WHEN p.payment_status NOT IN ('Paid', 'Cancelled') THEN p.amount_due ELSE 0 END), 0) AS pending
-        FROM months
-        LEFT JOIN (
-            SELECT p.*
-            FROM payments p
-            INNER JOIN payment_types pt ON pt.payment_type_id = p.payment_type_id
-            WHERE LOWER(pt.payment_name) IN ('monthly hoa dues', 'monthly hoa dues + penalty')
-        ) AS p
-          ON p.billing_month >= months.month_start
-         AND p.billing_month < (months.month_start + INTERVAL '1 month')::date
-        GROUP BY months.month_start
-        ORDER BY months.month_start
-    ");
-    $stmt->execute();
-    $response['monthly_dues_compliance'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    foreach ($response['monthly_dues_compliance'] as &$month) {
-        $month['billed'] = (float) $month['billed'];
-        $month['collected'] = (float) $month['collected'];
-        $month['pending'] = (float) $month['pending'];
-        $month['collection_rate'] = $month['billed'] > 0
-            ? round(($month['collected'] / $month['billed']) * 100, 1)
-            : null;
-    }
-    unset($month);
-
     $stmt = $db->prepare("
         SELECT cc.category_name, COUNT(*) AS complaint_count
         FROM complaints c
@@ -375,7 +200,7 @@ try {
         $insights[] = array('severity' => 'high', 'title' => 'Collection rate needs attention', 'evidence' => number_format($response['collection_rate'], 1) . '% of this month\'s billed dues has been collected.', 'recommendation' => 'Send payment reminders and follow up with overdue households.', 'action_url' => '/payments');
     }
     if ($response['overdue_accounts'] > 0) {
-        $insights[] = array('severity' => 'high', 'rule_code' => 'OVERDUE_DUES_PRESENT', 'title' => 'Overdue accounts require follow-up', 'evidence' => $response['overdue_accounts'] . ' household(s) have ₱' . number_format($response['overdue_amount'], 2) . ' in recorded unpaid dues past the due date.', 'recommendation' => 'Review overdue accounts and send targeted payment reminders.', 'action_url' => '/payments');
+        $insights[] = array('severity' => 'high', 'rule_code' => 'OVERDUE_DUES_PRESENT', 'title' => 'Overdue accounts require follow-up', 'evidence' => $response['overdue_accounts'] . ' household(s) have ₱' . number_format($response['overdue_amount'], 2) . ' in overdue dues including calculated interest (receipts under verification excluded).', 'recommendation' => 'Review overdue accounts and send targeted payment reminders.', 'action_url' => '/payments');
     }
     if ($response['high_priority_complaints'] > 0) {
         $insights[] = array('severity' => 'high', 'title' => 'High-priority complaints are still open', 'evidence' => $response['high_priority_complaints'] . ' high- or critical-priority complaint(s) are unresolved.', 'recommendation' => 'Assign an officer and set an immediate resolution plan.', 'action_url' => '/complaints');
@@ -396,11 +221,6 @@ try {
         $insights[] = array('severity' => 'positive', 'title' => 'Community operations are on track', 'evidence' => 'No current rule has triggered an urgent intervention.', 'recommendation' => 'Continue monitoring collections and complaint updates.', 'action_url' => '/officer-dashboard');
     }
 
-    // This value is intentionally the recorded unpaid bill balance. Resident
-    // dues screens calculate the Board Resolution's compounding interest at
-    // viewing time, so that projected interest is not overstated as a posted
-    // invoice amount in officer analytics.
-    $response['overdue_amount_basis'] = 'Recorded unpaid dues only; excludes dynamically projected future compound interest.';
     $response['dss_insights'] = $insights;
     $response['generated_at'] = gmdate('c');
 

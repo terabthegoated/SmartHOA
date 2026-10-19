@@ -14,6 +14,8 @@ interface AnalyticsData {
   airbnb_properties: number;
   renter_properties: number;
   outstanding_dues: number;
+  outstanding_dues_interest: number;
+  dues_under_verification: number;
   pending_verifications: number;
   current_month_billed: number;
   current_month_collected: number;
@@ -112,6 +114,8 @@ const OfficerDashboard = () => {
         airbnb_properties: toFiniteNumber(result.airbnb_properties),
         renter_properties: toFiniteNumber(result.renter_properties),
         outstanding_dues: toFiniteNumber(result.outstanding_dues),
+        outstanding_dues_interest: toFiniteNumber(result.outstanding_dues_interest),
+        dues_under_verification: toFiniteNumber(result.dues_under_verification),
         pending_verifications: toFiniteNumber(result.pending_verifications),
         current_month_billed: toFiniteNumber(result.current_month_billed),
         current_month_collected: toFiniteNumber(result.current_month_collected),
@@ -275,6 +279,8 @@ const OfficerDashboard = () => {
                 <h3 className="text-3xl font-bold text-gray-800">
                   ₱{Number(data?.outstanding_dues || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </h3>
+                <p className="mt-1 text-xs text-gray-500">Includes calculated interest; excludes receipts under verification.</p>
+                {Number(data?.dues_under_verification) > 0 && <p className="mt-1 text-xs text-blue-600">Under verification: ₱{Number(data?.dues_under_verification).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>}
               </div>
             </div>
 
@@ -298,11 +304,11 @@ const OfficerDashboard = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
                 <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl"><CircleDollarSign size={24} /></div>
-                <div><p className="text-sm text-gray-500 font-semibold">Collection Rate</p><h3 className="text-2xl font-bold text-gray-800">{data?.collection_rate !== null && data?.collection_rate !== undefined ? `${data.collection_rate}%` : '—'}</h3><p className="text-xs text-gray-400">Current month</p></div>
+                <div><p className="text-sm text-gray-500 font-semibold">Collection Rate</p><h3 className="text-2xl font-bold text-gray-800">{data?.collection_rate !== null && data?.collection_rate !== undefined ? `${data.collection_rate}%` : '—'}</h3><p className="text-xs text-gray-400">Current-month dues principal settled</p></div>
               </div>
               <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
                 <div className="p-3 bg-red-50 text-red-600 rounded-xl"><AlertCircle size={24} /></div>
-                <div><p className="text-sm text-gray-500 font-semibold">Overdue Accounts</p><h3 className="text-2xl font-bold text-gray-800">{data?.overdue_accounts || 0}</h3><p className="text-xs text-gray-400">Current month</p></div>
+                <div><p className="text-sm text-gray-500 font-semibold">Overdue Accounts</p><h3 className="text-2xl font-bold text-gray-800">{data?.overdue_accounts || 0}</h3><p className="text-xs text-gray-400">Excludes receipts under verification</p></div>
               </div>
               <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
                 <div className="p-3 bg-blue-50 text-blue-600 rounded-xl"><ClipboardList size={24} /></div>
