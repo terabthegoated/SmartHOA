@@ -11,11 +11,16 @@ try {
   const render = issue => renderToStaticMarkup(createElement(Notice, { issue, onReview() {} }));
   const duplicate = render({ kind: 'duplicate', message: 'This resident already has an HOA dues bill for this billing month.' });
   assert.match(duplicate, /role="alert"/);
-  assert.match(duplicate, /A bill already exists for this month/);
+  assert.match(duplicate, /A bill already exists for the selected billing month/);
   assert.match(duplicate, /Review existing bills/);
   assert.match(duplicate, /No new bill was created/);
   assert.match(duplicate, /Your form details have been kept/);
   console.log('PASS: duplicate bill renders an accessible inline warning and review action.');
+
+  const november = render({ kind: 'duplicate', billingLabel: 'November 2026', message: 'This resident already has an HOA dues bill for November 2026.' });
+  assert.match(november, /A bill already exists for November 2026/);
+  assert.doesNotMatch(november, /for this month/);
+  console.log('PASS: the duplicate notice names November rather than the current month.');
 
   const error = render({ kind: 'error', message: 'Please retry when the connection is available.' });
   assert.match(error, /Bill could not be created/);
@@ -36,6 +41,9 @@ try {
   assert.match(handler, /finally\s*\{\s*setIsGenerating\(false\)/);
   assert.match(source, /aria-labelledby="generate-bill-title"/);
   assert.match(source, /<fieldset disabled=\{isGenerating\}/);
+  assert.match(handler, /billing_month: billPeriodPayload\(billingPeriod.month\)/);
+  assert.match(source, /id="bill-billing-month" type="month" required/);
+  assert.match(source, /setBillingPeriod\(current => billPeriodForDueDate\(current, e.target.value\)\)/);
   console.log('PASS: generate-bill handling has no native alert and always resets its loading state.');
-  console.log('4/4 bill-notice rendering / wiring checks passed; no bills generated.');
+  console.log('5/5 bill-notice rendering / wiring checks passed; no bills generated.');
 } finally { await server.close(); }

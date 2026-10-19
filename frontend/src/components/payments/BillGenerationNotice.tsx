@@ -4,6 +4,7 @@ import { AlertCircle, Search } from 'lucide-react';
 export interface BillGenerationIssue {
   kind: 'duplicate' | 'error';
   message: string;
+  billingLabel?: string;
 }
 
 export default function BillGenerationNotice({ issue, noticeRef, onReview }: {
@@ -21,7 +22,7 @@ export default function BillGenerationNotice({ issue, noticeRef, onReview }: {
         <AlertCircle size={20} aria-hidden="true" className={`mt-0.5 shrink-0 ${duplicate ? 'text-amber-700' : 'text-red-600'}`} />
         <div className="min-w-0">
           <h4 className={`text-sm font-bold ${duplicate ? 'text-amber-900' : 'text-red-800'}`}>
-            {duplicate ? 'A bill already exists for this month' : 'Bill could not be created'}
+            {duplicate ? `A bill already exists for ${issue.billingLabel || 'the selected billing month'}` : 'Bill could not be created'}
           </h4>
           <p className={`mt-1 break-words text-sm leading-5 ${duplicate ? 'text-amber-800' : 'text-red-700'}`}>{issue.message}</p>
           {duplicate && <>

@@ -13,6 +13,7 @@ require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../../helpers/fcm.php';
 require_once __DIR__ . '/../../helpers/payment_settlement.php';
+require_once __DIR__ . '/../../helpers/bill_billing_month.php';
 use \Firebase\JWT\JWT;
 use \Firebase\JWT\Key;
 
@@ -82,18 +83,16 @@ if ($authHeader) {
                 exit();
             }
 
-            if ($billingMonthInput !== '') {
-                $billingMonthDate = DateTimeImmutable::createFromFormat('!Y-m-d', $billingMonthInput);
-                $billingMonthErrors = DateTimeImmutable::getLastErrors();
-                if ($billingMonthDate === false || ($billingMonthErrors !== false && ($billingMonthErrors['warning_count'] > 0 || $billingMonthErrors['error_count'] > 0))) {
-                    http_response_code(400);
-                    echo json_encode(array("message" => "Billing month must use the YYYY-MM-DD format."));
-                    exit();
-                }
-                $billingMonth = $billingMonthDate->format('Y-m-01');
-            } else {
-                $billingMonth = dues_balance_date()->format('Y-m-01');
+            try {
+                // Respect an explicitly selected period. For older clients,
+                // infer the period from the due date, never the creation month.
+                $billingMonth = bill_billing_month($billingMonthInput, $dueDateObject);
+            } catch (InvalidArgumentException $error) {
+                http_response_code(400);
+                echo json_encode(['message' => $error->getMessage()]);
+                exit();
             }
+            $billingLabel = (new DateTimeImmutable($billingMonth))->format('F Y');
 
             $database = new Database();
             $db = $database->getConnection();
@@ -142,7 +141,10 @@ if ($authHeader) {
                 if (dues_balance_is_monthly($paymentType['payment_name']) && dues_balance_monthly_bill_exists($db, $residentId, $billingMonth)) {
                     $db->rollBack();
                     http_response_code(409);
-                    echo json_encode(['message' => 'This resident already has an HOA dues bill for this billing month. Review the existing bill instead of creating another.']);
+                    echo json_encode([
+                        'message' => 'This resident already has an HOA dues bill for ' . $billingLabel . '. Review the existing bill instead of creating another.',
+                        'billing_month' => $billingMonth, 'billing_label' => $billingLabel,
+                    ]);
                     exit();
                 }
                 $query = "
@@ -163,6 +165,7 @@ if ($authHeader) {
                 if (!empty($recipientUserId)) {
                     $notificationTitle = 'New bill awaiting payment';
                     $notificationMessage = $paymentType['payment_name']
+                        . ' for ' . $billingLabel
                         . ' of ₱' . number_format($amountDue, 2)
                         . ' has been added to your account and is due on ' . $formattedDueDate . '.';
                     $notificationStatement = $db->prepare("
@@ -194,6 +197,8 @@ if ($authHeader) {
 
                 echo json_encode(array(
                     "message" => "Bill generated successfully.",
+                    "billing_month" => $billingMonth,
+                    "billing_label" => $billingLabel,
                     "notification_created" => $notificationCreated
                 ));
             } catch (Exception $e) {
