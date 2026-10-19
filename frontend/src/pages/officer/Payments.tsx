@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import axios from 'axios';
-import { Search, Plus, CheckCircle2, XCircle, Clock, FileText, X, Image as ImageIcon, Download, FileSpreadsheet, BellRing, AlertCircle, Gavel } from 'lucide-react';
+import { Search, Plus, CheckCircle2, XCircle, Clock, FileText, X, Image as ImageIcon, Download, FileSpreadsheet, BellRing, AlertCircle, Gavel, LoaderCircle } from 'lucide-react';
 import { API_BASE_URL } from '../../config/api';
 import DuesImportPreviewModal from '../../components/payments/DuesImportPreviewModal';
 import PaymentAmount, { paymentTotal, formatPesos, type PaymentBalance } from '../../components/payments/PaymentAmount';
+import BillGenerationNotice, { type BillGenerationIssue } from '../../components/payments/BillGenerationNotice';
 
 interface Payment extends PaymentBalance {
   payment_id: string;
@@ -72,6 +73,8 @@ const Payments = () => {
   
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [billGenerationIssue, setBillGenerationIssue] = useState<BillGenerationIssue | null>(null);
+  const billGenerationNoticeRef = useRef<HTMLDivElement>(null);
   const [isImportPreviewOpen, setIsImportPreviewOpen] = useState(false);
   const [isSendingReminders, setIsSendingReminders] = useState(false);
   const [reminderResult, setReminderResult] = useState<ReminderResult | null>(null);
@@ -147,18 +150,21 @@ const Payments = () => {
     .filter((type): type is PaymentType => Boolean(type));
 
   const selectResident = (resident: Resident) => {
+    setBillGenerationIssue(null);
     setSelectedResidentId(resident.resident_id);
     setResidentSearch('');
     setIsResidentPickerOpen(false);
   };
 
   const clearResidentSelection = () => {
+    setBillGenerationIssue(null);
     setSelectedResidentId('');
     setResidentSearch('');
     setIsResidentPickerOpen(true);
   };
 
   const handleBillTypeChange = (paymentTypeId: string) => {
+    setBillGenerationIssue(null);
     setSelectedTypeId(paymentTypeId);
 
     const selectedType = paymentTypes.find((type) => type.payment_type_id === paymentTypeId);
@@ -168,7 +174,8 @@ const Payments = () => {
   };
 
   const handleGenerateBill = async () => {
-    if (!selectedResidentId || !selectedTypeId || !amount || !dueDate) return;
+    if (!selectedResidentId || !selectedTypeId || !amount || !dueDate || isGenerating) return;
+    setBillGenerationIssue(null);
     setIsGenerating(true);
 
     try {
@@ -189,10 +196,26 @@ const Payments = () => {
       setDueDate('');
     } catch (error) {
       console.error("Failed to generate bill", error);
-      alert(axios.isAxiosError(error) ? error.response?.data?.message || 'Unable to generate bill.' : 'Unable to generate bill.');
+      const message = axios.isAxiosError(error) ? error.response?.data?.message : undefined;
+      setBillGenerationIssue({
+        kind: axios.isAxiosError(error) && error.response?.status === 409 ? 'duplicate' : 'error',
+        message: typeof message === 'string' && message.trim() ? message : 'Please check the bill details and try again. Your form details have been kept.',
+      });
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  useEffect(() => {
+    if (!isGenerateModalOpen || !billGenerationIssue) return;
+    billGenerationNoticeRef.current?.focus({ preventScroll: true });
+    billGenerationNoticeRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [billGenerationIssue, isGenerateModalOpen]);
+
+  const reviewExistingBills = () => {
+    if (selectedResident) setSearchTerm(`${selectedResident.first_name} ${selectedResident.last_name}`.trim());
+    setIsGenerateModalOpen(false);
+    setBillGenerationIssue(null);
   };
 
   const handleApprovePayment = async () => {
@@ -444,7 +467,7 @@ const Payments = () => {
             Import 2026 Dues
           </button>
           <button 
-            onClick={() => setIsGenerateModalOpen(true)}
+            onClick={() => { setBillGenerationIssue(null); setIsGenerateModalOpen(true); }}
             className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brown px-5 py-2.5 font-semibold text-white shadow-sm transition-colors hover:bg-brown-dark sm:w-auto"
           >
             <Plus size={18} />
@@ -779,16 +802,18 @@ const Payments = () => {
 
       {/* Generate Bill Modal */}
       {isGenerateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] shadow-xl overflow-y-auto animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-              <h3 className="font-bold text-gray-800">Generate New Bill</h3>
-              <button onClick={() => setIsGenerateModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 backdrop-blur-sm animate-in fade-in duration-200 sm:p-4">
+          <div role="dialog" aria-modal="true" aria-labelledby="generate-bill-title" aria-busy={isGenerating}
+            className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-xl animate-in zoom-in-95 duration-200 sm:max-h-[90dvh]">
+            <div className="shrink-0 px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h3 id="generate-bill-title" className="font-bold text-gray-800">Generate New Bill</h3>
+              <button type="button" disabled={isGenerating} aria-label="Close bill form" onClick={() => setIsGenerateModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50">
                 <X size={20} />
               </button>
             </div>
             
-            <div className="p-6 space-y-4">
+            <fieldset disabled={isGenerating} className="min-h-0 min-w-0 space-y-4 overflow-y-auto p-5 sm:p-6">
+              {billGenerationIssue && <BillGenerationNotice issue={billGenerationIssue} noticeRef={billGenerationNoticeRef} onReview={reviewExistingBills} />}
               <div>
                 <label htmlFor="resident-search" className="block text-sm font-semibold text-gray-700 mb-2">Find Resident</label>
                 <div className="relative">
@@ -882,7 +907,7 @@ const Payments = () => {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Amount (₱)</label>
                   <input 
@@ -891,7 +916,7 @@ const Payments = () => {
                     placeholder="0.00"
                     className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-brown focus:ring-1 focus:ring-brown bg-white"
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    onChange={(e) => { setBillGenerationIssue(null); setAmount(e.target.value); }}
                   />
                 </div>
                 <div>
@@ -900,26 +925,30 @@ const Payments = () => {
                     type="date"
                     className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-brown focus:ring-1 focus:ring-brown bg-white"
                     value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
+                    onChange={(e) => { setBillGenerationIssue(null); setDueDate(e.target.value); }}
                   />
                 </div>
               </div>
-            </div>
+            </fieldset>
 
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
+            <div className="grid shrink-0 grid-cols-2 gap-3 border-t border-gray-100 bg-gray-50 px-5 py-4 sm:flex sm:justify-end sm:px-6">
               <button 
+                type="button"
+                disabled={isGenerating}
                 onClick={() => setIsGenerateModalOpen(false)}
-                className="px-5 py-2.5 rounded-xl font-semibold text-gray-600 hover:bg-gray-200 transition-colors"
+                className="min-h-11 px-5 py-2.5 rounded-xl font-semibold text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button 
+                type="button"
                 onClick={handleGenerateBill}
                 disabled={!selectedResidentId || !selectedTypeId || !amount || !dueDate || isGenerating}
-                className={`px-5 py-2.5 rounded-xl font-semibold text-white flex items-center gap-2 transition-colors ${
+                className={`min-h-11 px-5 py-2.5 rounded-xl font-semibold text-white flex items-center justify-center gap-2 transition-colors ${
                   !selectedResidentId || !selectedTypeId || !amount || !dueDate || isGenerating ? 'bg-brown/50 cursor-not-allowed' : 'bg-brown hover:bg-brown-dark'
                 }`}
               >
+                {isGenerating && <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />}
                 {isGenerating ? 'Generating...' : 'Confirm Bill'}
               </button>
             </div>
