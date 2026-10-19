@@ -4,8 +4,9 @@ import axios from 'axios';
 import { Search, Plus, CheckCircle2, XCircle, Clock, FileText, X, Image as ImageIcon, Download, FileSpreadsheet, BellRing, AlertCircle, Gavel } from 'lucide-react';
 import { API_BASE_URL } from '../../config/api';
 import DuesImportPreviewModal from '../../components/payments/DuesImportPreviewModal';
+import PaymentAmount, { paymentTotal, formatPesos, type PaymentBalance } from '../../components/payments/PaymentAmount';
 
-interface Payment {
+interface Payment extends PaymentBalance {
   payment_id: string;
   amount_due: string;
   due_date: string;
@@ -90,6 +91,15 @@ const Payments = () => {
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
   const [verifyingPayment, setVerifyingPayment] = useState<Payment | null>(null);
   const [isApproving, setIsApproving] = useState(false);
+  const [receiptAmountConfirmed, setReceiptAmountConfirmed] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  const openPayment = (payment: Payment) => {
+    setVerifyingPayment(payment);
+    setReceiptAmountConfirmed(false);
+    setPaymentError(null);
+    setIsVerifyModalOpen(true);
+  };
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -179,24 +189,28 @@ const Payments = () => {
       setDueDate('');
     } catch (error) {
       console.error("Failed to generate bill", error);
+      alert(axios.isAxiosError(error) ? error.response?.data?.message || 'Unable to generate bill.' : 'Unable to generate bill.');
     } finally {
       setIsGenerating(false);
     }
   };
 
   const handleApprovePayment = async () => {
-    if (!verifyingPayment) return;
+    if (!verifyingPayment || !receiptAmountConfirmed || isApproving) return;
     setIsApproving(true);
+    setPaymentError(null);
     
     try {
       await axios.post(`${API_BASE_URL}/api/officer/approve_payment.php`, {
-        payment_id: verifyingPayment.payment_id
+        payment_id: verifyingPayment.payment_id,
+        confirmed_amount: paymentTotal(verifyingPayment)
       }, { headers: { Authorization: `Bearer ${token}` } });
       
       await fetchData();
       setIsVerifyModalOpen(false);
     } catch (error) {
       console.error("Failed to approve payment", error);
+      setPaymentError(axios.isAxiosError(error) ? error.response?.data?.message || 'Unable to approve payment.' : 'Unable to approve payment.');
     } finally {
       setIsApproving(false);
     }
@@ -329,7 +343,7 @@ const Payments = () => {
   const exportToCSV = () => {
     if (filteredPayments.length === 0) return;
     
-    const headers = ['Payment ID', 'Resident', 'Block', 'Lot', 'Bill Type', 'Amount Due', 'Due Date', 'Status'];
+    const headers = ['Payment ID', 'Resident', 'Block', 'Lot', 'Bill Type', 'Principal', 'Calculated Interest', 'Total / Recorded Paid', 'Balance As Of', 'Due Date', 'Status'];
     const rows = filteredPayments.map(p => [
       p.payment_id,
       `"${p.first_name} ${p.last_name}"`,
@@ -337,6 +351,9 @@ const Payments = () => {
       p.lot || 'N/A',
       p.type_name,
       p.amount_due,
+      p.interest_amount ?? 0,
+      paymentTotal(p),
+      p.balance_as_of ?? '',
       new Date(p.due_date).toLocaleDateString(),
       p.payment_status
     ]);
@@ -354,7 +371,7 @@ const Payments = () => {
   };
 
   const getStatusBadge = (status: string, receiptUrl: string | null) => {
-    if (status === 'Pending' && receiptUrl) {
+    if (status !== 'Paid' && status !== 'Cancelled' && receiptUrl) {
       return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200"><Clock size={12} /> Pending Verification</span>;
     }
     switch (status) {
@@ -522,7 +539,7 @@ const Payments = () => {
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Amount</p>
-                  <p className="mt-1 text-lg font-bold text-gray-800">₱{parseFloat(payment.amount_due).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  <div className="mt-1 text-lg text-gray-800"><PaymentAmount payment={payment} /></div>
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Due date</p>
@@ -534,8 +551,7 @@ const Payments = () => {
                 type="button"
                 disabled={payment.payment_status === 'Paid' && !payment.receipt_url}
                 onClick={() => {
-                  setVerifyingPayment(payment);
-                  setIsVerifyModalOpen(true);
+                  openPayment(payment);
                 }}
                 className={`mt-4 flex min-h-11 w-full items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
                   payment.payment_status === 'Paid'
@@ -590,7 +606,7 @@ const Payments = () => {
                       </div>
                     </td>
                     <td className="py-4 px-6 font-bold text-gray-800">
-                      ₱{parseFloat(payment.amount_due).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      <PaymentAmount payment={payment} />
                     </td>
                     <td className="py-4 px-6 text-sm text-gray-600">
                       {new Date(payment.due_date).toLocaleDateString()}
@@ -602,8 +618,7 @@ const Payments = () => {
                       <button 
                         disabled={payment.payment_status === 'Paid' && !payment.receipt_url}
                         onClick={() => {
-                          setVerifyingPayment(payment);
-                          setIsVerifyModalOpen(true);
+                          openPayment(payment);
                         }}
                         className={`text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 ${
                           payment.payment_status === 'Paid' 
@@ -690,7 +705,7 @@ const Payments = () => {
       {/* Verify Payment Modal */}
       {isVerifyModalOpen && verifyingPayment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[95dvh] flex flex-col shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
               <h3 className="font-bold text-gray-800">Verify Payment</h3>
               <button onClick={() => setIsVerifyModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
@@ -698,7 +713,7 @@ const Payments = () => {
               </button>
             </div>
             
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6 overflow-y-auto">
               <div className="flex justify-between items-start">
                 <div>
                   <h4 className="font-bold text-gray-800 text-lg">{verifyingPayment.first_name} {verifyingPayment.last_name}</h4>
@@ -706,7 +721,7 @@ const Payments = () => {
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-gray-500 font-semibold mb-1">Amount Due</p>
-                  <h3 className="text-2xl font-bold text-brown">₱{parseFloat(verifyingPayment.amount_due).toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
+                  <div className="text-2xl text-brown"><PaymentAmount payment={verifyingPayment} /></div>
                 </div>
               </div>
 
@@ -729,7 +744,14 @@ const Payments = () => {
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-between items-center bg-gray-50">
+            {verifyingPayment.payment_status !== 'Paid' && verifyingPayment.receipt_url && (
+              <label className="mx-6 mb-4 flex items-start gap-3 text-sm text-gray-700">
+                <input type="checkbox" className="mt-1 shrink-0" checked={receiptAmountConfirmed} onChange={e => setReceiptAmountConfirmed(e.target.checked)} />
+                <span>I verified that the receipt covers {formatPesos(paymentTotal(verifyingPayment))}, including the listed interest. Do not approve a partial payment as fully paid.</span>
+              </label>
+            )}
+            {paymentError && <p role="alert" className="mx-6 mb-4 text-sm text-red-600">{paymentError}</p>}
+            <div className="px-6 py-4 border-t border-gray-100 flex flex-wrap gap-3 justify-between items-center bg-gray-50">
               <span className="text-xs text-gray-500">Bill Type: <strong>{verifyingPayment.type_name}</strong></span>
               <div className="flex gap-3">
                 <button 
@@ -741,9 +763,9 @@ const Payments = () => {
                 {verifyingPayment.payment_status !== 'Paid' && verifyingPayment.receipt_url && (
                   <button 
                     onClick={handleApprovePayment}
-                    disabled={isApproving}
+                    disabled={isApproving || !receiptAmountConfirmed}
                     className={`px-5 py-2.5 rounded-xl font-semibold text-white flex items-center gap-2 transition-colors ${
-                      isApproving ? 'bg-green-500/50 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
+                      isApproving || !receiptAmountConfirmed ? 'bg-green-500/50 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
                     }`}
                   >
                     {isApproving ? 'Approving...' : 'Approve Payment'}

@@ -11,6 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
 
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/../../helpers/dues_balances.php';
 use \Firebase\JWT\JWT;
 use \Firebase\JWT\Key;
 
@@ -53,11 +54,14 @@ if ($authHeader) {
             $query = "
                 SELECT 
                     p.payment_id,
+                    p.resident_id,
                     p.amount_due,
                     p.due_date,
                     p.billing_month,
                     p.payment_status,
                     pt.payment_name as type_name,
+                    (SELECT MIN(pr.uploaded_at) FROM payment_receipts pr WHERE pr.payment_id = p.payment_id) AS receipt_submitted_at,
+                    (SELECT MAX(t.amount_paid) FROM payment_transactions t WHERE t.payment_id = p.payment_id) AS recorded_paid_amount,
                     EXISTS(SELECT 1 FROM payment_receipts pr WHERE pr.payment_id = p.payment_id) as has_receipt
                 FROM payments p
                 LEFT JOIN payment_types pt ON p.payment_type_id = pt.payment_type_id
@@ -70,7 +74,7 @@ if ($authHeader) {
             $stmt->execute([$decoded->data->user_id]);
             
             $payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            echo json_encode($payments);
+            echo json_encode(dues_balance_payment_views($payments));
 
         } catch (Exception $e) {
             http_response_code(401);

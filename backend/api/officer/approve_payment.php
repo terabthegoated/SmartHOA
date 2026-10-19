@@ -12,6 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../../helpers/fcm.php';
+require_once __DIR__ . '/../../helpers/payment_settlement.php';
 use \Firebase\JWT\JWT;
 use \Firebase\JWT\Key;
 
@@ -54,60 +55,15 @@ if ($authHeader) {
 
             $database = new Database();
             $db = $database->getConnection();
-            $db->beginTransaction();
-
-            try {
-                // Get the payment amount and the user_id to notify
-                $stmt = $db->prepare("
-                    SELECT p.amount_due, rp.user_id, pt.payment_name as type_name
-                    FROM payments p 
-                    JOIN resident_profiles rp ON p.resident_id = rp.resident_id
-                    LEFT JOIN payment_types pt ON p.payment_type_id = pt.payment_type_id
-                    WHERE p.payment_id = ?
-                ");
-                $stmt->execute([$data->payment_id]);
-                $payment_info = $stmt->fetch(PDO::FETCH_ASSOC);
-
-                if (!$payment_info) {
-                    throw new Exception("Payment not found.");
-                }
-
-                $amount_due = $payment_info['amount_due'];
-                $recipient_user_id = $payment_info['user_id'];
-                $type_name = $payment_info['type_name'] ?? 'HOA Dues';
-
-                // Update payment status to Paid
-                $stmt = $db->prepare("UPDATE payments SET payment_status = 'Paid' WHERE payment_id = ?");
-                $stmt->execute([$data->payment_id]);
-
-                // Insert into payment_transactions
-                $stmt = $db->prepare("
-                    INSERT INTO payment_transactions (payment_id, amount_paid, payment_date, approved_by, remarks) 
-                    VALUES (?, ?, CURRENT_DATE, ?, 'Approved by Officer')
-                ");
-                $stmt->execute([$data->payment_id, $amount_due, $decoded->data->user_id]);
-
-                // Insert Notification
-                $notif_title = "Payment Approved";
-                $notif_message = "Your payment of ₱" . number_format($amount_due, 2) . " for {$type_name} has been verified and approved.";
-                $stmt = $db->prepare("
-                    INSERT INTO notifications (recipient_id, title, message, notification_type) 
-                    VALUES (?, ?, ?, 'Payment')
-                ");
-                $stmt->execute([$recipient_user_id, $notif_title, $notif_message]);
-
-                $db->commit();
-                send_fcm_push($db, [$recipient_user_id], $notif_title, $notif_message, 'Payment', '/my-payments');
-                http_response_code(200);
-                echo json_encode(array("message" => "Payment successfully approved."));
-            } catch (Exception $e) {
-                $db->rollBack();
-                throw $e;
+            $result = approve_recorded_payment($db, $data->payment_id, $decoded->data->user_id, $data->confirmed_amount ?? null);
+            if (empty($result['already_approved'])) {
+                send_fcm_push($db, [$result['recipient_id']], $result['title'], $result['notification_message'], 'Payment', '/my-payments');
             }
-
+            echo json_encode(['message' => $result['message'], 'already_approved' => $result['already_approved']]);
         } catch (Exception $e) {
-            http_response_code(500);
-            echo json_encode(array("message" => "Failed to approve payment.", "error" => $e->getMessage()));
+            $code = in_array($e->getCode(), [404, 409], true) ? $e->getCode() : 500;
+            http_response_code($code);
+            echo json_encode(['message' => $code === 500 ? 'Failed to approve payment.' : $e->getMessage()]);
         }
     }
 } else {

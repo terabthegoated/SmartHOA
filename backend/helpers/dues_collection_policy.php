@@ -11,6 +11,8 @@
 
 require_once __DIR__ . '/fcm.php';
 require_once __DIR__ . '/payment_reminders.php';
+require_once __DIR__ . '/dues_balances.php';
+require_once __DIR__ . '/payment_settlement.php';
 
 function dues_policy_today($date = null) {
     $timezone = new DateTimeZone('Asia/Manila');
@@ -95,41 +97,20 @@ function dues_policy_periods_from_rows(array $paymentRows, DateTimeInterface $as
  * calendar day. This matches the "on or before the 16th" Board rule.
  */
 function dues_policy_calculate_periods(array $periods, DateTimeInterface $asOf) {
-    $timezone = new DateTimeZone('Asia/Manila');
-    $asOfDate = DateTimeImmutable::createFromInterface($asOf)->setTimezone($timezone)->setTime(0, 0, 0);
-    $runningBalance = 0.0;
-    $baseBalance = 0.0;
-    $monthsOverdue = 0;
-    $oldestDueDate = null;
-
-    foreach ($periods as $period) {
-        $baseAmount = round((float) ($period['base_amount'] ?? 0), 2);
-        if ($baseAmount <= 0 || empty($period['due_date'])) {
-            continue;
-        }
-
-        $dueDate = $period['due_date'] instanceof DateTimeInterface
-            ? DateTimeImmutable::createFromInterface($period['due_date'])->setTimezone($timezone)->setTime(0, 0, 0)
-            : new DateTimeImmutable((string) $period['due_date'], $timezone);
-
-        $baseBalance = round($baseBalance + $baseAmount, 2);
-        $runningBalance = round($runningBalance + $baseAmount, 2);
-
-        if ($asOfDate > $dueDate) {
-            $runningBalance = round($runningBalance * 1.10, 2);
-            $monthsOverdue++;
-            if ($oldestDueDate === null) {
-                $oldestDueDate = $dueDate;
-            }
-        }
+    $rows = [];
+    foreach ($periods as $key => $period) {
+        if (empty($period['due_date']) || ($period['base_amount'] ?? 0) <= 0) continue;
+        $rows[] = ['payment_id' => (string) $key, 'amount_due' => $period['base_amount'],
+            'due_date' => dues_balance_date($period['due_date'])->format('Y-m-d'),
+            'payment_status' => 'Pending', 'type_name' => 'Monthly HOA Dues'];
     }
-
+    $summary = dues_balance_summary(dues_balance_payment_views($rows, $asOf), $asOf);
     return array(
-        'base_balance' => round($baseBalance, 2),
-        'total_balance' => round($runningBalance, 2),
-        'interest_amount' => round($runningBalance - $baseBalance, 2),
-        'months_overdue' => $monthsOverdue,
-        'oldest_due_date' => $oldestDueDate
+        'base_balance' => $summary['base_dues'],
+        'total_balance' => $summary['amount_due'],
+        'interest_amount' => $summary['penalty_amount'],
+        'months_overdue' => $summary['months_overdue'],
+        'oldest_due_date' => $summary['overdue_amount'] > 0 ? dues_balance_date($summary['due_date']) : null
     );
 }
 
@@ -183,13 +164,14 @@ function run_dues_collection_policy(PDO $db, $runDate = null) {
     $monthlyDuesAmount = 325.00;
     $activeResidents = dues_policy_fetch_active_residents($db, $today);
 
-    $hasMonthlyBill = $db->prepare("\n        SELECT 1\n        FROM payments p\n        INNER JOIN payment_types pt ON pt.payment_type_id = p.payment_type_id\n        WHERE p.resident_id = ?\n          AND p.billing_month = ?\n          AND LOWER(pt.payment_name) IN ('monthly hoa dues', 'monthly hoa dues + penalty')\n        LIMIT 1\n    ");
+    $hasMonthlyBill = $db->prepare("\n        SELECT 1\n        FROM payments p\n        INNER JOIN payment_types pt ON pt.payment_type_id = p.payment_type_id\n        WHERE p.resident_id = ?\n          AND p.billing_month = ?\n          AND p.payment_status <> 'Cancelled'\n          AND LOWER(TRIM(pt.payment_name)) IN ('monthly hoa dues', 'monthly hoa dues + penalty')\n        LIMIT 1\n    ");
     $createBill = $db->prepare("\n        INSERT INTO payments (resident_id, payment_type_id, billing_month, amount_due, due_date, payment_status)\n        VALUES (?, ?, ?, ?, ?, 'Pending')\n    ");
     $createNotification = $db->prepare("\n        INSERT INTO notifications (recipient_id, title, message, notification_type)\n        VALUES (?, ?, ?, 'Payment')\n    ");
 
     $db->beginTransaction();
     try {
         foreach ($activeResidents as $resident) {
+            dues_balance_lock_resident($db, $resident['resident_id']);
             $hasMonthlyBill->execute([$resident['resident_id'], $monthKey]);
             if ($hasMonthlyBill->fetchColumn()) {
                 continue;

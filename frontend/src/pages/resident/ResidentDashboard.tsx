@@ -4,9 +4,14 @@ import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { API_BASE_URL } from '../../config/api';
+import { formatPesos } from '../../components/payments/PaymentAmount';
 
 interface DuesSummary {
-  status: 'Paid' | 'Due' | 'Overdue' | 'Awaiting bill' | 'Not applicable';
+  status: 'Paid' | 'Due' | 'Overdue' | 'Under review' | 'Awaiting bill' | 'Not applicable';
+  overdue_amount?: number;
+  upcoming_amount?: number;
+  under_review_amount?: number;
+  as_of_date?: string;
   amount_due: number;
   base_dues: number;
   penalty_amount: number;
@@ -67,6 +72,7 @@ const ResidentDashboard = () => {
     message: 'Checking your current dues.',
   });
   const [isLoadingDues, setIsLoadingDues] = useState(true);
+  const [duesUnavailable, setDuesUnavailable] = useState(false);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [isLoadingAnnouncements, setIsLoadingAnnouncements] = useState(true);
   const [announcementsUnavailable, setAnnouncementsUnavailable] = useState(false);
@@ -75,30 +81,38 @@ const ResidentDashboard = () => {
 
   useEffect(() => {
     let isCurrent = true;
+    let pending = false;
 
     const fetchDues = async () => {
-      if (!token) return;
+      if (!token || pending) return;
+      pending = true;
 
       try {
         const response = await axios.get<DuesSummary>(`${API_BASE_URL}/api/resident/get_dues_to_pay.php`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (isCurrent) setDues(response.data);
+        if (isCurrent) { setDues(response.data); setDuesUnavailable(false); }
       } catch (error) {
         console.error('Unable to load current dues.', error);
         if (isCurrent) {
+          setDuesUnavailable(true);
           setDues((current) => ({
             ...current,
             message: 'Current dues are unavailable right now. Please try again later.',
           }));
         }
       } finally {
+        pending = false;
         if (isCurrent) setIsLoadingDues(false);
       }
     };
 
     void fetchDues();
-    return () => { isCurrent = false; };
+    const refresh = () => { if (document.visibilityState === 'visible') void fetchDues(); };
+    window.addEventListener('focus', refresh);
+    // Refresh the projection across midnight / after officer approval while open.
+    const interval = window.setInterval(refresh, 60000);
+    return () => { isCurrent = false; window.removeEventListener('focus', refresh); window.clearInterval(interval); };
   }, [token]);
 
   useEffect(() => {
@@ -163,8 +177,8 @@ const ResidentDashboard = () => {
 
   const isOverdue = dues.status === 'Overdue';
   const isPaid = dues.status === 'Paid';
-  const hasPendingDues = !isLoadingDues && (dues.status === 'Due' || isOverdue) && Number(dues.amount_due) > 0;
-  const displayedAmount = dues.status === 'Awaiting bill' || dues.status === 'Not applicable'
+  const hasPendingDues = !duesUnavailable && !isLoadingDues && (dues.status === 'Due' || isOverdue) && Number(dues.amount_due) > 0;
+  const displayedAmount = duesUnavailable ? 'Unavailable' : dues.status === 'Awaiting bill' || dues.status === 'Not applicable'
     ? '—'
     : `₱${Number(dues.amount_due || 0).toLocaleString(undefined, {
     minimumFractionDigits: 2,
@@ -199,6 +213,15 @@ const ResidentDashboard = () => {
               {dues.billing_label && <span className="font-semibold">{dues.billing_label}: </span>}
               {dues.message}
             </p>
+            {!isLoadingDues && !duesUnavailable && dues.overdue_amount !== undefined && (
+              <div className="mt-2 space-y-1 text-xs text-gray-600">
+                {dues.overdue_amount > 0 && <p>Overdue now: <strong>{formatPesos(dues.overdue_amount)}</strong></p>}
+                {Number(dues.upcoming_amount) > 0 && <p>Not yet overdue: <strong>{formatPesos(Number(dues.upcoming_amount))}</strong></p>}
+                {dues.penalty_amount > 0 && <p>Included interest: {formatPesos(dues.penalty_amount)}</p>}
+                {Number(dues.under_review_amount) > 0 && <p className="text-blue-600">Under verification (excluded above): {formatPesos(Number(dues.under_review_amount))}</p>}
+                {dues.as_of_date && <p className="text-gray-400">As of {formatDueDate(dues.as_of_date)} (Philippine time)</p>}
+              </div>
+            )}
             {!isLoadingDues && dues.collection_stage && !isPaid && (
               <p className={`mt-2 text-xs font-bold ${isOverdue ? 'text-red-700' : 'text-brown'}`}>
                 {dues.collection_stage}
@@ -261,8 +284,8 @@ const ResidentDashboard = () => {
                       {isOverdue ? 'Payment overdue' : 'New or pending bill'}
                     </p>
                     <p className={`text-sm leading-5 mt-1 ${isOverdue ? 'text-red-700' : 'text-gray-600'}`}>
-                      {dues.billing_label ? `${dues.billing_label}: ` : ''}
-                      {displayedAmount} is due {isOverdue ? 'now' : `by ${formatDueDate(dues.due_date)}`}.
+                      {isOverdue ? formatPesos(dues.overdue_amount ?? dues.amount_due) : displayedAmount}
+                      {isOverdue ? ' is overdue now.' : ` is outstanding. Next due date: ${formatDueDate(dues.due_date)}.`}
                     </p>
                     <p className={`text-xs leading-5 mt-2 ${isOverdue ? 'text-red-700' : 'text-gray-500'}`}>
                       {dues.message}
@@ -277,7 +300,7 @@ const ResidentDashboard = () => {
               <div className="py-4 text-center text-gray-500">
                 <CheckCircle2 size={30} className="mx-auto mb-2 text-green-500" />
                 <p className="text-sm font-semibold text-gray-700">
-                  {isPaid ? 'No payment is due right now.' : 'No pending payment reminders.'}
+                  {duesUnavailable ? 'Unable to refresh your balance. Reopen this page to retry.' : dues.status === 'Under review' ? 'Receipt awaiting officer verification.' : isPaid ? 'No payment is due right now.' : 'No pending payment reminders.'}
                 </p>
                 <p className="text-xs mt-1">{dues.message}</p>
               </div>

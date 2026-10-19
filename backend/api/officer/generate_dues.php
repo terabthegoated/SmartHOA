@@ -12,6 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../../helpers/fcm.php';
+require_once __DIR__ . '/../../helpers/payment_settlement.php';
 use \Firebase\JWT\JWT;
 use \Firebase\JWT\Key;
 
@@ -91,7 +92,7 @@ if ($authHeader) {
                 }
                 $billingMonth = $billingMonthDate->format('Y-m-01');
             } else {
-                $billingMonth = date('Y-m-01');
+                $billingMonth = dues_balance_date()->format('Y-m-01');
             }
 
             $database = new Database();
@@ -137,6 +138,13 @@ if ($authHeader) {
             // prevents a resident from receiving a notice if bill creation fails.
             $db->beginTransaction();
             try {
+                dues_balance_lock_resident($db, $residentId);
+                if (dues_balance_is_monthly($paymentType['payment_name']) && dues_balance_monthly_bill_exists($db, $residentId, $billingMonth)) {
+                    $db->rollBack();
+                    http_response_code(409);
+                    echo json_encode(['message' => 'This resident already has an HOA dues bill for this billing month. Review the existing bill instead of creating another.']);
+                    exit();
+                }
                 $query = "
                     INSERT INTO payments (resident_id, payment_type_id, amount_due, due_date, billing_month, payment_status)
                     VALUES (?, ?, ?, ?, ?, 'Pending')

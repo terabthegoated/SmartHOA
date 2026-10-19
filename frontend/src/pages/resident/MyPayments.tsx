@@ -3,8 +3,9 @@ import { useAuthStore } from '../../store/authStore';
 import axios from 'axios';
 import { Search, CheckCircle2, XCircle, Clock, FileText, UploadCloud, FileImage } from 'lucide-react';
 import { API_BASE_URL } from '../../config/api';
+import PaymentAmount, { type PaymentBalance } from '../../components/payments/PaymentAmount';
 
-interface Payment {
+interface Payment extends PaymentBalance {
   payment_id: string;
   amount_due: string;
   due_date: string;
@@ -71,16 +72,14 @@ const MyPayments = () => {
       setUploadSuccess(true);
       
       // Update local state to reflect receipt upload
-      setPayments(payments.map(p => 
-        p.payment_id === selectedPayment.payment_id ? { ...p, has_receipt: true } : p
-      ));
+      await fetchData();
 
       setTimeout(() => {
         setIsModalOpen(false);
       }, 2000);
     } catch (error) {
       console.error("Failed to upload receipt", error);
-      alert("Failed to upload receipt. Please try again.");
+      alert(axios.isAxiosError(error) ? error.response?.data?.message || 'Unable to upload receipt.' : 'Unable to upload receipt.');
     } finally {
       setIsUploading(false);
     }
@@ -91,7 +90,7 @@ const MyPayments = () => {
   );
 
   const getStatusBadge = (status: string, hasReceipt: boolean) => {
-    if (status === 'Pending' && hasReceipt) {
+    if (status !== 'Paid' && status !== 'Cancelled' && hasReceipt) {
       return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200"><Clock size={12} /> In Review</span>;
     }
 
@@ -155,7 +154,7 @@ const MyPayments = () => {
               <div className="mt-4 grid grid-cols-2 gap-3 border-y border-gray-100 py-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Amount</p>
-                  <p className="mt-1 text-lg font-bold text-gray-800">₱{parseFloat(payment.amount_due).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  <div className="mt-1 text-lg text-gray-800"><PaymentAmount payment={payment} /></div>
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Due date</p>
@@ -218,7 +217,7 @@ const MyPayments = () => {
                       {new Date(payment.billing_month).toLocaleDateString('default', { month: 'long', year: 'numeric' })}
                     </td>
                     <td className="py-4 px-6 font-bold text-gray-800">
-                      ₱{parseFloat(payment.amount_due).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      <PaymentAmount payment={payment} />
                     </td>
                     <td className="py-4 px-6 text-sm text-gray-600">
                       {new Date(payment.due_date).toLocaleDateString()}
@@ -262,7 +261,8 @@ const MyPayments = () => {
             <div className="space-y-4 overflow-y-auto p-5 sm:p-6">
               <div className="bg-cream p-4 rounded-xl border border-brown/10">
                 <p className="text-sm text-gray-500 font-semibold mb-1">Total Amount Due</p>
-                <h2 className="text-3xl font-bold text-brown">₱{parseFloat(selectedPayment.amount_due).toLocaleString(undefined, { minimumFractionDigits: 2 })}</h2>
+                <div className="text-3xl text-brown"><PaymentAmount payment={selectedPayment} /></div>
+                <p className="mt-2 text-xs text-gray-500">Interest is monthly, not daily. Pay through the HOA's accepted channel, then upload proof covering this bill's full total.</p>
                 <p className="text-sm text-gray-600 mt-2">For: <strong>{selectedPayment.type_name}</strong></p>
               </div>
 

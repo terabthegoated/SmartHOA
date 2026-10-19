@@ -11,6 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
 
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/../../helpers/payment_settlement.php';
 use \Firebase\JWT\JWT;
 use \Firebase\JWT\Key;
 
@@ -49,43 +50,62 @@ if ($authHeader) {
                 exit();
             }
 
-            $payment_id = $_POST['payment_id'];
+            $paymentId = trim((string) $_POST['payment_id']);
             $file = $_FILES['receipt'];
-
-            // Create uploads directory if it doesn't exist
-            $upload_dir = '../../uploads/receipts/';
-            if (!file_exists($upload_dir)) {
-                mkdir($upload_dir, 0777, true);
+            if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || ($file['size'] ?? 0) > 5 * 1024 * 1024) {
+                http_response_code(400);
+                echo json_encode(['message' => 'Upload a receipt image no larger than 5 MB.']);
+                exit();
             }
-
-            // Generate unique filename
-            $file_extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-            $new_filename = uniqid('receipt_', true) . '.' . $file_extension;
-            $target_file = $upload_dir . $new_filename;
-
-            // Save file
-            if (move_uploaded_file($file['tmp_name'], $target_file)) {
-                $database = new Database();
-                $db = $database->getConnection();
-
-                $file_url = '/uploads/receipts/' . $new_filename;
-
-                $query = "INSERT INTO payment_receipts (payment_id, file_url) VALUES (?, ?)";
-                $stmt = $db->prepare($query);
-                $stmt->execute([$payment_id, $file_url]);
-
-                echo json_encode(array(
-                    "message" => "Receipt uploaded successfully.",
-                    "file_url" => $file_url
-                ));
-            } else {
-                http_response_code(500);
-                echo json_encode(array("message" => "Failed to save uploaded file."));
+            $mime = (new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
+            $extensions = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
+            if (!isset($extensions[$mime])) {
+                http_response_code(400);
+                echo json_encode(['message' => 'Receipt must be a JPEG, PNG or WebP image.']);
+                exit();
             }
-
+            $database = new Database();
+            $db = $database->getConnection();
+            // Resolve ownership before accepting any file or freezing a balance.
+            $lookup = $db->prepare('SELECT p.resident_id FROM payments p JOIN resident_profiles rp ON rp.resident_id = p.resident_id WHERE p.payment_id = ? AND rp.user_id = ?');
+            $lookup->execute([$paymentId, $decoded->data->user_id]);
+            $residentId = $lookup->fetchColumn();
+            if (!$residentId) {
+                http_response_code(404);
+                echo json_encode(['message' => 'Bill not found for your account.']);
+                exit();
+            }
+            $savedFile = null;
+            $db->beginTransaction();
+            try {
+                dues_balance_lock_resident($db, $residentId);
+                $bill = $db->prepare('SELECT payment_status, EXISTS(SELECT 1 FROM payment_receipts r WHERE r.payment_id = p.payment_id) AS has_receipt FROM payments p WHERE payment_id = ?');
+                $bill->execute([$paymentId]);
+                $row = $bill->fetch(PDO::FETCH_ASSOC);
+                if (!in_array($row['payment_status'], ['Pending', 'Overdue'], true) || $row['has_receipt']) {
+                    throw new RuntimeException('This bill is already settled or has a receipt under review.', 409);
+                }
+                $directory = __DIR__ . '/../../uploads/receipts/';
+                if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
+                    throw new RuntimeException('Receipt storage is unavailable.');
+                }
+                $filename = 'receipt_' . bin2hex(random_bytes(16)) . '.' . $extensions[$mime];
+                $target = $directory . $filename;
+                if (!move_uploaded_file($file['tmp_name'], $target)) throw new RuntimeException('Receipt could not be stored.');
+                $savedFile = $target;
+                $fileUrl = '/uploads/receipts/' . $filename;
+                $db->prepare('INSERT INTO payment_receipts (payment_id, file_url) VALUES (?, ?)')->execute([$paymentId, $fileUrl]);
+                $db->commit();
+                echo json_encode(['message' => 'Receipt uploaded successfully.', 'file_url' => $fileUrl]);
+            } catch (Throwable $error) {
+                if ($db->inTransaction()) $db->rollBack();
+                if ($savedFile !== null && is_file($savedFile)) unlink($savedFile);
+                throw $error;
+            }
         } catch (Exception $e) {
-            http_response_code(401);
-            echo json_encode(array("message" => "Access denied.", "error" => $e->getMessage()));
+            $code = $e->getCode() === 409 ? 409 : 500;
+            http_response_code($code);
+            echo json_encode(['message' => $code === 409 ? $e->getMessage() : 'Unable to submit receipt. Please sign in again or retry.']);
         }
     }
 } else {

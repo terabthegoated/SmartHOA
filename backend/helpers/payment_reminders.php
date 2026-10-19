@@ -8,6 +8,7 @@
  */
 
 require_once __DIR__ . '/fcm.php';
+require_once __DIR__ . '/dues_balances.php';
 
 /** Return the Manila calendar date used for collection-policy checks. */
 function payment_reminder_today($date = null) {
@@ -76,9 +77,9 @@ function payment_reminder_stage_for_due_date($dueDate, DateTimeInterface $today)
 
     $courtesy = $due->modify('-7 days');
     $final = $due->modify('-1 day');
-    $firstNotice = $due->modify('+1 day');
-    $secondNotice = $due->modify('+1 month +1 day');
-    $thirdNotice = $due->modify('+2 months +1 day');
+    $firstNotice = dues_balance_notice_date($due, 1);
+    $secondNotice = dues_balance_notice_date($due, 2);
+    $thirdNotice = dues_balance_notice_date($due, 3);
     $todayString = $runDate->format('Y-m-d');
 
     if ($todayString === $courtesy->format('Y-m-d')) {
